@@ -1,0 +1,105 @@
+apply plugin: 'com.android.library'
+apply plugin: 'com.github.dcendents.android-maven'
+apply plugin: 'com.jfrog.bintray'
+
+group = properties['project.group']
+version = properties['project.version']
+project.archivesBaseName = properties['project.artifactId']
+
+android {
+    compileSdkVersion Integer.parseInt(ANDROID_BUILD_SDK_VERSION)
+    buildToolsVersion ANDROID_BUILD_SDK_VERSION
+
+    defaultConfig {
+        minSdkVersion ANDROID_BUILD_MIN_SDK_VERSION
+        targetSdkVersion ANDROID_BUILD_TARGET_SDK_VERSION
+    }
+}
+
+bintray {
+    user = project.properties.get('bintray.user')
+    key = project.properties.get('bintray.apikey')
+
+    configurations = ['archives']
+
+    publish = true
+    dryRun = true
+
+    pkg {
+        repo = project.properties.get('bintray.repo')
+        name = project.properties.get('bintray.package')
+        userOrg = project.properties.get('bintray.organization')
+        websiteUrl = project.properties.get('project.website')
+        vcsUrl = project.properties.get('project.github')
+        licenses = ["Apache-2.0"]
+        /*version {
+            mavenCentralSync {
+                sync = true
+                user = project.properties.get('nexus.user')
+                password = project.properties.get('nexus.password')
+            }
+        }*/
+    }
+}
+
+install {
+    repositories.mavenInstaller {
+      // This generates POM.xml with proper parameters
+        pom {
+            project {
+                packaging 'aar'
+
+                // Add your description here
+                name properties['project.artifactId']
+                url properties['project.website']
+
+                // Set your license
+                licenses {
+                    license {
+                        name 'The Apache Software License, Version 2.0'
+                        url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                    }
+                }
+                developers {
+                    developer {
+                        id properties['developer.id']
+                        name properties['developer.name']
+                        email properties['developer.email']
+                    }
+                }
+                scm {
+                    connection properties['project.github']
+                    developerConnection properties['project.github']
+                    url properties['project.website']
+                }
+            }
+        }
+    }
+}
+
+dependencies {
+}
+
+task sourcesJar(type: Jar) {
+    from android.sourceSets.main.java.srcDirs
+    classifier = 'sources'
+}
+
+task javadoc(type: Javadoc) {
+    source = android.sourceSets.main.java.srcDirs
+    classpath += project.files(android.getBootClasspath().join(File.pathSeparator))
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    classifier = 'javadoc'
+    from javadoc.destinationDir
+}
+
+configurations {
+    archives
+}
+
+artifacts {
+    archives javadocJar
+    archives sourcesJar
+}
