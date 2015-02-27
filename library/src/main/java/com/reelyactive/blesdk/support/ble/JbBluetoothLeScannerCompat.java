@@ -22,9 +22,9 @@ import android.bluetooth.BluetoothManager;
 import android.content.Context;
 import android.content.Intent;
 
-import org.uribeacon.scan.util.Clock;
-import org.uribeacon.scan.util.Logger;
-import org.uribeacon.scan.util.SystemClock;
+import com.reelyactive.blesdk.support.ble.util.Clock;
+import com.reelyactive.blesdk.support.ble.util.Logger;
+import com.reelyactive.blesdk.support.ble.util.SystemClock;
 
 import java.util.HashMap;
 import java.util.HashSet;

@@ -19,7 +19,7 @@ import android.annotation.TargetApi;
 import android.bluetooth.BluetoothManager;
 import android.os.Build;
 
-import org.uribeacon.scan.util.Logger;
+import com.reelyactive.blesdk.support.ble.util.Logger;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;

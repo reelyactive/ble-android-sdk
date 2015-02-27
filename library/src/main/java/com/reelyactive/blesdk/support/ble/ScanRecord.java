@@ -25,7 +25,7 @@ import android.os.ParcelUuid;
 import android.support.annotation.Nullable;
 import android.util.SparseArray;
 
-import org.uribeacon.scan.util.Logger;
+import com.reelyactive.blesdk.support.ble.util.Logger;
 
 import java.util.ArrayList;
 import java.util.Arrays;

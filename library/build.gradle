@@ -14,6 +14,16 @@ android {
         minSdkVersion ANDROID_BUILD_MIN_SDK_VERSION
         targetSdkVersion ANDROID_BUILD_TARGET_SDK_VERSION
     }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_7
+        targetCompatibility JavaVersion.VERSION_1_7
+    }
 }
 
 bintray {
@@ -44,7 +54,7 @@ bintray {
 
 install {
     repositories.mavenInstaller {
-      // This generates POM.xml with proper parameters
+        // This generates POM.xml with proper parameters
         pom {
             project {
                 packaging 'aar'
@@ -78,6 +88,7 @@ install {
 }
 
 dependencies {
+    compile 'com.android.support:support-v4:21.0.3'
 }
 
 task sourcesJar(type: Jar) {
