@@ -112,6 +112,7 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
 
   private final BluetoothAdapter bluetoothAdapter;
   /* @VisibleForTesting */ final HashMap<ScanCallback, ScanClient> serialClients;
+  private BluetoothCrashResolver crashResolver;
 
   /**
    * The Bluetooth LE callback which will be registered with the OS,
@@ -134,6 +135,8 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
       ScanResult result = new ScanResult(device, ScanRecord.parseFromBytes(scanRecordBytes), rssi,
           currentTimeInNanos);
       onScanResult(device.getAddress(), result);
+      if(crashResolver != null)
+        crashResolver.notifyScannedDevice(device, this);
     }
   };
 
@@ -145,6 +148,8 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
     this(manager, alarmManager, new SystemClock(),
         PendingIntent.getBroadcast(context, 0 /* requestCode */,
             new Intent(context, ScanWakefulBroadcastReceiver.class), 0 /* flags */));
+      this.crashResolver = new BluetoothCrashResolver(context);
+      this.crashResolver.start();
   }
 
   /**
