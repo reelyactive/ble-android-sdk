@@ -60,8 +60,8 @@ install {
                 packaging 'aar'
 
                 // Add your description here
-                name properties['project.artifactId']
-                url properties['project.website']
+                name project.properties.get('project.artifactId')
+                url project.properties.get('project.website')
 
                 // Set your license
                 licenses {
@@ -72,15 +72,15 @@ install {
                 }
                 developers {
                     developer {
-                        id properties['developer.id']
-                        name properties['developer.name']
-                        email properties['developer.email']
+                        id project.properties.get('developer.id')
+                        name project.properties.get('developer.name')
+                        email project.properties.get('developer.email')
                     }
                 }
                 scm {
-                    connection properties['project.github']
-                    developerConnection properties['project.github']
-                    url properties['project.website']
+                    connection project.properties.get('project.github')
+                    developerConnection project.properties.get('project.github')
+                    url project.properties.get('project.website')
                 }
             }
         }
