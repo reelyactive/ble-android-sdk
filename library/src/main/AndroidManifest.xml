@@ -3,6 +3,9 @@
 
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+    <!-- This is required for the scan library. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
     <!--
     Declare this required feature if you want to make the app available to BLE-capable
     devices only.  If you want to make your app available to devices that don't support BLE,
@@ -13,15 +16,15 @@
         android:name="android.hardware.bluetooth_le"
         android:required="true" />
 
-    <!-- This is required for the scan library. -->
-    <receiver android:name="org.uribeacon.scan.compat.ScanWakefulBroadcastReceiver" />
-
-    <!-- This is required for the scan library. -->
-    <service
-        android:name="org.uribeacon.scan.compat.ScanWakefulService"
-        android:exported="false" />
     <application>
 
+        <!-- This is required for the scan library. -->
+        <receiver android:name="com.reelyactive.blesdk.support.ble.ScanWakefulBroadcastReceiver" />
+
+        <!-- This is required for the scan library. -->
+        <service
+            android:name="com.reelyactive.blesdk.support.ble.ScanWakefulService"
+            android:exported="false" />
     </application>
 
 </manifest>
