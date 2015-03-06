@@ -66,7 +66,7 @@ public class ReelyAwareApplicationCallback implements Application.ActivityLifecy
     public void onActivityResumed(Activity activity) {
         Log.d(TAG, "activity resumed");
         current = activity;
-        if (isReelyAware(activity) && activityCount.incrementAndGet() == 1) {
+        if (isReelyAware(activity) && activityCount.incrementAndGet() == 1 && isBound) {
             updateScanType(getScanType());
             startScan();
         }
@@ -82,7 +82,7 @@ public class ReelyAwareApplicationCallback implements Application.ActivityLifecy
     public void onActivityPaused(Activity activity) {
         Log.d(TAG, "activity paused");
         current = null;
-        if (isReelyAware(activity) && activityCount.decrementAndGet() <= 0) {
+        if (isReelyAware(activity) && activityCount.decrementAndGet() <= 0 && isBound) {
             updateScanType(getScanType());
             startScan();
         }
@@ -218,6 +218,7 @@ public class ReelyAwareApplicationCallback implements Application.ActivityLifecy
      * This method is called when the {@link BleService is available}.<br/>
      * The default behaviour is to start a scan.
      */
+    @DebugLog
     protected void onBleServiceBound() {
         updateScanType(getScanType());
         updateScanFilter(getScanFilter());

@@ -20,7 +20,7 @@ import java.util.Arrays;
 
 import hugo.weaving.DebugLog;
 
-public abstract class BleService extends Service {
+public class BleService extends Service {
     public static final String KEY_FILTER = "filter";
     /**
      * Keeps track of all current registered clients.
