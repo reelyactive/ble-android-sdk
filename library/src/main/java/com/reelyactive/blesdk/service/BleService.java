@@ -16,11 +16,12 @@ import com.reelyactive.blesdk.support.ble.ScanSettings;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
-import java.util.List;
+import java.util.Arrays;
 
 import hugo.weaving.DebugLog;
 
 public abstract class BleService extends Service {
+    public static final String KEY_FILTER = "filter";
     /**
      * Keeps track of all current registered clients.
      */
@@ -38,13 +39,15 @@ public abstract class BleService extends Service {
             .setScanResultType(ScanSettings.SCAN_RESULT_TYPE_FULL) //
             .build();
     private ScanSettings currentSettings;
+    private ScanSettings nextSettings;
+    private ScanFilter currentFilter;
+    private ScanFilter nextFilter;
 
 
     /**
      * Target we publish for clients to send messages to IncomingHandler.
      */
     final Messenger mMessenger = new Messenger(new IncomingHandler(this));
-    private ScanSettings nextSettings;
 
     @Override
     @DebugLog
@@ -70,6 +73,8 @@ public abstract class BleService extends Service {
     public static enum Command {
         START_SCAN,
         STOP_SCAN,
+        SET_SCAN_FILTER,
+        SET_SCAN_TYPE,
         REGISTER_CLIENT,
         UNREGISTER_CLIENT,
         UNKNOWN;
@@ -85,14 +90,15 @@ public abstract class BleService extends Service {
 
     public static enum Event {
         IN_REGION,
-        OUT_REGION;
+        OUT_REGION,
+        UNKNOWN;
         private static Event[] allValues = values();
 
-        public static Event fromOrdinal(int n) throws IllegalArgumentException {
-            if (n < 0 || n >= allValues.length) {
-                throw new IllegalArgumentException("This event does not exist !");
+        public static Event fromOrdinal(int n) {
+            if (n >= 0 || n < UNKNOWN.ordinal()) {
+                return allValues[n];
             }
-            return allValues[n];
+            return UNKNOWN;
         }
     }
 
@@ -133,11 +139,13 @@ public abstract class BleService extends Service {
 
         private Object convertParam(Command command, Message msg) {
             switch (command) {
-                case START_SCAN:
+                case SET_SCAN_TYPE:
                     return msg.arg1;
                 case REGISTER_CLIENT:
                 case UNREGISTER_CLIENT:
                     return msg.replyTo;
+                case SET_SCAN_FILTER:
+                    return msg.getData().getParcelable(KEY_FILTER);
             }
             return null;
         }
@@ -161,12 +169,17 @@ public abstract class BleService extends Service {
                 mClients.add((Messenger) param);
                 break;
             case START_SCAN:
-                ScanType type = ScanType.fromOrdinal((int) param);
-                nextSettings = ScanType.ACTIVE == type ? higPowerScan : lowPowerScan;
                 startScan();
                 break;
             case STOP_SCAN:
                 stopScan();
+                break;
+            case SET_SCAN_TYPE:
+                ScanType type = ScanType.fromOrdinal((int) param);
+                nextSettings = ScanType.ACTIVE == type ? higPowerScan : lowPowerScan;
+                break;
+            case SET_SCAN_FILTER:
+                nextFilter = (ScanFilter) param;
                 break;
             default:
                 handled = false;
@@ -174,16 +187,16 @@ public abstract class BleService extends Service {
         return handled;
     }
 
-    public abstract List<ScanFilter> getFilters();
-
     @DebugLog
     private void startScan() {
         nextSettings = nextSettings == null ? lowPowerScan : nextSettings;
-        if (currentSettings != nextSettings) {
+        nextFilter = nextFilter == null ? (currentFilter == null ? new ScanFilter.Builder().build() : currentFilter) : nextFilter;
+        if (currentSettings != nextSettings || nextFilter != currentFilter) {
             scanner.stopScan(callback);
-            scanner.startScan(getFilters(), nextSettings, callback);
+            scanner.startScan(Arrays.asList(nextFilter), nextSettings, callback); // TODO make it possible to scan using more filters
         }
         currentSettings = nextSettings;
+        currentFilter = nextFilter;
     }
 
     @DebugLog

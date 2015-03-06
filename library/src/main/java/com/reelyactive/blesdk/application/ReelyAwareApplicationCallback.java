@@ -11,22 +11,25 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
 import android.os.Messenger;
+import android.os.ParcelUuid;
 import android.os.RemoteException;
 import android.util.Log;
 
 import com.reelyactive.blesdk.service.BleService;
+import com.reelyactive.blesdk.support.ble.ScanFilter;
 
+import java.lang.ref.WeakReference;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import hugo.weaving.DebugLog;
 
 /**
  * This class provides a convenient way to make your application aware of any Reelceivers.
- * <p>
+ * <p/>
  * Register it using {@link android.app.Application#registerActivityLifecycleCallbacks(Application.ActivityLifecycleCallbacks)}<br/>
- * <p>
+ * <p/>
  * Extend it to customize the behaviour of your application.
- * <p>
+ * <p/>
  * The default behaviour is to bind to the {@link BleService} as soon as the app is created.
  *
  * @see android.app.Application.ActivityLifecycleCallbacks
@@ -39,11 +42,12 @@ public class ReelyAwareApplicationCallback implements Application.ActivityLifecy
     private boolean isBound = false;
     private final AtomicInteger activityCount = new AtomicInteger();
     private Messenger toService;
-    private final Messenger fromService = new Messenger(new IncomingHahdler());
+    private final Messenger fromService = new Messenger(new IncomingHahdler(this));
     private Activity current;
 
     /**
      * As soon as the component is created, we bindBleService to the {@link BleService}
+     *
      * @param context The application's {@link Context}
      */
     public ReelyAwareApplicationCallback(Context context) {
@@ -55,6 +59,7 @@ public class ReelyAwareApplicationCallback implements Application.ActivityLifecy
     /**
      * The default behaviour is to check if a {@link ReelyAwareActivity} is running, and call a scan if so.<br/>
      * See {@link #startScan()} and {@link #getScanType()}
+     *
      * @param activity The resumed {@link Activity}
      */
     @Override
@@ -62,6 +67,7 @@ public class ReelyAwareApplicationCallback implements Application.ActivityLifecy
         Log.d(TAG, "activity resumed");
         current = activity;
         if (isReelyAware(activity) && activityCount.incrementAndGet() == 1) {
+            updateScanType(getScanType());
             startScan();
         }
     }
@@ -69,6 +75,7 @@ public class ReelyAwareApplicationCallback implements Application.ActivityLifecy
     /**
      * The default behaviour is to check if any {@link ReelyAwareActivity} is still running, and call a scan if so.<br/>
      * See {@link #startScan()} and {@link #getScanType()}
+     *
      * @param activity The resumed {@link Activity}.
      */
     @Override
@@ -76,17 +83,16 @@ public class ReelyAwareApplicationCallback implements Application.ActivityLifecy
         Log.d(TAG, "activity paused");
         current = null;
         if (isReelyAware(activity) && activityCount.decrementAndGet() <= 0) {
+            updateScanType(getScanType());
             startScan();
         }
     }
 
     /**
-     * This method can be called to request a scan.<br/>
-     * It makes a call to {@link #getScanType} in order to determine the type of scan.
+     * This method sends a scan request to the {@link BleService}.
      */
     protected void startScan() {
         Message scanRequest = Message.obtain(null, BleService.Command.START_SCAN.ordinal());
-        scanRequest.arg1 = getScanType().ordinal();
         try {
             toService.send(scanRequest);
         } catch (RemoteException e) {
@@ -95,7 +101,48 @@ public class ReelyAwareApplicationCallback implements Application.ActivityLifecy
     }
 
     /**
-     * Override this in order to chose which kind of scan is to be used when {@link #startScan} is called.
+     * This method sets the scan type of the {@link BleService}.
+     *
+     * @param scanType The {@link BleService.ScanType scan type}
+     */
+    protected void updateScanType(BleService.ScanType scanType) {
+        Message scanRequest = Message.obtain(null, BleService.Command.SET_SCAN_TYPE.ordinal());
+        scanRequest.arg1 = scanType.ordinal();
+        try {
+            toService.send(scanRequest);
+        } catch (RemoteException e) {
+            Log.e(TAG, "Failed to update ScanType.", e);
+        }
+    }
+
+    /**
+     * This method sets the scan filter of the {@link BleService}.
+     *
+     * @param scanFilter The {@link ScanFilter scan filter}
+     */
+    protected void updateScanFilter(ScanFilter scanFilter) {
+        Message scanRequest = Message.obtain(null, BleService.Command.SET_SCAN_FILTER.ordinal());
+        Bundle data = new Bundle();
+        data.putParcelable(BleService.KEY_FILTER, scanFilter);
+        scanRequest.setData(data);
+        try {
+            toService.send(scanRequest);
+        } catch (RemoteException e) {
+            Log.e(TAG, "Failed to update ScanFilter.", e);
+        }
+    }
+
+    /**
+     * Override this in order to chose which scan filter is to be used before {@link #startScan} is called when the service starts.
+     *
+     * @return The {@link ScanFilter} to be used in the current application state.
+     */
+    protected ScanFilter getScanFilter() {
+        return new ScanFilter.Builder().setServiceUuid(ParcelUuid.fromString("7265656C-7941-6374-6976-652055554944")).build();
+    }
+
+    /**
+     * Override this in order to chose which kind of scan is to be used before {@link #startScan} is called when the service starts.
      *
      * @return The {@link BleService.ScanType} to be used in the current application state.
      */
@@ -133,11 +180,15 @@ public class ReelyAwareApplicationCallback implements Application.ActivityLifecy
                     ((ReelyAwareActivity) getCurrentActivity()).onLeaveRegion();
                 }
                 break;
+            default:
+                Log.d(TAG, "Unhandled BLE Event : " + event);
+                break;
         }
     }
 
     /**
      * Access the application {@link Context}.
+     *
      * @return The application {@link Context}.
      */
     protected Context getContext() {
@@ -146,6 +197,7 @@ public class ReelyAwareApplicationCallback implements Application.ActivityLifecy
 
     /**
      * Get currently running Activity.
+     *
      * @return The currently running Activity.
      */
     protected Activity getCurrentActivity() {
@@ -154,6 +206,7 @@ public class ReelyAwareApplicationCallback implements Application.ActivityLifecy
 
     /**
      * Find out if an {@link Activity} implements {@link ReelyAwareActivity}
+     *
      * @param activity The {@link Activity}
      * @return true if the {@link Activity} implements {@link ReelyAwareActivity}, false if not.
      */
@@ -166,6 +219,8 @@ public class ReelyAwareApplicationCallback implements Application.ActivityLifecy
      * The default behaviour is to start a scan.
      */
     protected void onBleServiceBound() {
+        updateScanType(getScanType());
+        updateScanFilter(getScanFilter());
         startScan();
     }
 
@@ -192,7 +247,6 @@ public class ReelyAwareApplicationCallback implements Application.ActivityLifecy
         }
     }
 
-
     final class BleServiceConnection implements ServiceConnection {
         @Override
         @DebugLog
@@ -216,14 +270,19 @@ public class ReelyAwareApplicationCallback implements Application.ActivityLifecy
         }
     }
 
-    final class IncomingHahdler extends Handler {
+    final static class IncomingHahdler extends Handler {
+        private WeakReference<ReelyAwareApplicationCallback> callback;
+
+        public IncomingHahdler(ReelyAwareApplicationCallback callback) {
+            this.callback = new WeakReference<ReelyAwareApplicationCallback>(callback);
+        }
+
         @Override
         public void handleMessage(Message msg) {
-            try {
-                BleService.Event event = BleService.Event.fromOrdinal(msg.what);
-                onBleEvent(event);
-            } catch (IllegalArgumentException e) {
-
+            BleService.Event event = BleService.Event.fromOrdinal(msg.what);
+            ReelyAwareApplicationCallback applicationCallback = callback.get();
+            if (applicationCallback != null) {
+                applicationCallback.onBleEvent(event);
             }
         }
     }
