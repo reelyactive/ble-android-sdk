@@ -1,10 +1,22 @@
 apply plugin: 'com.android.library'
 apply plugin: 'com.github.dcendents.android-maven'
 apply plugin: 'com.jfrog.bintray'
+apply plugin: 'com.jakewharton.hugo'
 
 group = properties['project.group']
 version = properties['project.version']
 project.archivesBaseName = properties['project.artifactId']
+def isRelease = !((String)project.properties.get('project.version')).contains("SNAPSHOT")
+def isSnapshot = !isRelease
+
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.jakewharton.hugo:hugo-plugin:1.2.1'
+    }
+}
 
 android {
     compileSdkVersion Integer.parseInt(ANDROID_BUILD_SDK_VERSION)
@@ -16,6 +28,7 @@ android {
     }
     buildTypes {
         release {
+            debuggable isSnapshot
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
@@ -33,7 +46,7 @@ bintray {
     configurations = ['archives']
 
     publish = true
-    dryRun = true
+    dryRun = isSnapshot
 
     pkg {
         repo = project.properties.get('bintray.repo')
