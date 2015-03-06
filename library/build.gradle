@@ -33,7 +33,7 @@ bintray {
     configurations = ['archives']
 
     publish = true
-    dryRun = false
+    dryRun = true
 
     pkg {
         repo = project.properties.get('bintray.repo')
