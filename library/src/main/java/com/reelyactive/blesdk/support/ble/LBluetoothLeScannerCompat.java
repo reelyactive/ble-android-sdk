@@ -161,7 +161,7 @@ class LBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
 
       @Override
       public void onScanFailed(int errorCode) {
-        Logger.logInfo("com.reelyactive.blesdk.support.ble.LBluetoothLeScannerCompat::onScanFailed(" + errorCode + ")");
+        Logger.logInfo("LBluetoothLeScannerCompat::onScanFailed(" + errorCode + ")");
         callback.onScanFailed(errorCode);
       }
     };

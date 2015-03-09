@@ -23,6 +23,7 @@ package com.reelyactive.blesdk.support.ble;/*
 //   Define setCustomScanTiming for ULR
 //   Slight updates to javadoc
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -57,7 +58,7 @@ public abstract class BluetoothLeScannerCompat {
         if (callback == null) {
             throw new IllegalArgumentException("callback is null");
         }
-        this.startScan(null, new ScanSettings.Builder().build(), callback);
+        this.startScan(new ArrayList<ScanFilter>(), new ScanSettings.Builder().build(), callback);
     }
 
     /**
