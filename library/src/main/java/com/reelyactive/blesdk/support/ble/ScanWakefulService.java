@@ -17,32 +17,35 @@ package com.reelyactive.blesdk.support.ble;/*
 import android.app.IntentService;
 import android.content.Intent;
 
+import com.reelyactive.blesdk.support.ble.util.Logger;
+
 /**
  * The com.reelyactive.blesdk.support.ble.ScanWakefulService Class is called with a WakeLock held, and executes a single Bluetooth LE
  * scan cycle. It then calls the {@link ScanWakefulBroadcastReceiver#completeWakefulIntent} with the
  * same intent to release the associated WakeLock.
  */
 public class ScanWakefulService extends IntentService {
+    public static final String EXTRA_USE_LOLLIPOP_API = "use_lollipop";
 
-  public ScanWakefulService() {
-    super("com.reelyactive.blesdk.support.ble.ScanWakefulService");
-  }
-
-  @Override
-  protected void onHandleIntent(Intent intent) {
-
-    // This method runs in a worker thread.
-    // At this point com.reelyactive.blesdk.support.ble.ScanWakefulBroadcastReceiver is still holding a WakeLock.
-    // We can do whatever we need to do in the code below.
-    // After the call to completeWakefulIntent the WakeLock is released.
-    try {
-      BluetoothLeScannerCompat bleScanner =
-          BluetoothLeScannerCompatProvider.getBluetoothLeScannerCompat(this);
-      if (bleScanner != null && bleScanner instanceof JbBluetoothLeScannerCompat) {
-        ((JbBluetoothLeScannerCompat) bleScanner).blockingScanCycle();
-      }
-    } finally {
-      ScanWakefulBroadcastReceiver.completeWakefulIntent(intent);
+    public ScanWakefulService() {
+        super("com.reelyactive.blesdk.support.ble.ScanWakefulService");
     }
-  }
+
+    @Override
+    protected void onHandleIntent(Intent intent) {
+        // This method runs in a worker thread.
+        // At this point com.reelyactive.blesdk.support.ble.ScanWakefulBroadcastReceiver is still holding a WakeLock.
+        // We can do whatever we need to do in the code below.
+        // After the call to completeWakefulIntent the WakeLock is released.
+        Logger.logDebug("Running scancycle");
+        try {
+            BluetoothLeScannerCompat bleScanner =
+                    BluetoothLeScannerCompatProvider.getBluetoothLeScannerCompat(this, intent.getBooleanExtra(EXTRA_USE_LOLLIPOP_API, true));
+            if (bleScanner != null) {
+                bleScanner.onNewScanCycle();
+            }
+        } finally {
+            ScanWakefulBroadcastReceiver.completeWakefulIntent(intent);
+        }
+    }
 }

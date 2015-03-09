@@ -23,6 +23,12 @@ package com.reelyactive.blesdk.support.ble;/*
 //   Define setCustomScanTiming for ULR
 //   Slight updates to javadoc
 
+import android.app.AlarmManager;
+import android.app.PendingIntent;
+
+import com.reelyactive.blesdk.support.ble.util.Clock;
+import com.reelyactive.blesdk.support.ble.util.Logger;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -44,6 +50,36 @@ import java.util.List;
  * Specification Supplement (CSS) v4</a>
  */
 public abstract class BluetoothLeScannerCompat {
+
+    // Number of cycles before a sighted device is considered lost.
+  /* @VisibleForTesting */ static final int SCAN_LOST_CYCLES = 4;
+
+    // Constants for Scan Cycle
+    // Low Power: 2.5 minute period with 1.5 seconds active (1% duty cycle)
+  /* @VisibleForTesting */ static final int LOW_POWER_IDLE_MILLIS = 148500;
+    /* @VisibleForTesting */ static final int LOW_POWER_ACTIVE_MILLIS = 1500;
+
+    // Balanced: 15 second period with 1.5 second active (10% duty cycle)
+  /* @VisibleForTesting */ static final int BALANCED_IDLE_MILLIS = 13500;
+    /* @VisibleForTesting */ static final int BALANCED_ACTIVE_MILLIS = 1500;
+
+    // Low Latency: 1.67 second period with 1.5 seconds active (90% duty cycle)
+  /* @VisibleForTesting */ static final int LOW_LATENCY_IDLE_MILLIS = 167;
+    /* @VisibleForTesting */ static final int LOW_LATENCY_ACTIVE_MILLIS = 1500;
+
+    // Default Scan Constants = Balanced
+    private int scanIdleMillis = BALANCED_IDLE_MILLIS;
+    private int scanActiveMillis = BALANCED_ACTIVE_MILLIS;
+
+    // Override values for scan window
+    private int overrideScanActiveMillis = -1;
+    private int overrideScanIdleMillis;
+
+    // Milliseconds to wait before considering a device lost. If set to a negative number
+    // SCAN_LOST_CYCLES is used to determine when to inform clients about lost events.
+    protected long scanLostOverrideMillis = -1;
+
+    private long alarmIntervalMillis;
 
     /**
      * Start Bluetooth LE scan with default parameters and no filters.
@@ -113,12 +149,124 @@ public abstract class BluetoothLeScannerCompat {
      *                                 launched opportunistically by the truncated batch mode scanner.  Ignored by
      *                                 non-truncated scanners.
      */
-    public abstract void setCustomScanTiming(
-            int scanMillis, int idleMillis, long serialScanDurationMillis);
+    public void setCustomScanTiming(
+            int scanMillis, int idleMillis, long serialScanDurationMillis) {
+        overrideScanActiveMillis = scanMillis;
+        overrideScanIdleMillis = idleMillis;
+        // reset scanner so it picks up new scan window values
+        updateRepeatingAlarm();
+    }
 
     /**
      * Sets the delay after which a device will be marked as lost if it hasn't been sighted
      * within the given time. Set to a negative value to allow default behaviour.
      */
-    public abstract void setScanLostOverride(long lostOverrideMillis);
+    public void setScanLostOverride(long lostOverrideMillis) {
+        scanLostOverrideMillis = lostOverrideMillis;
+    }
+
+    /**
+     * Compute the timestamp in the past which is the earliest that a sighting can have been
+     * seen; sightings last seen before this timestamp will be deemed to be too old.
+     * Then the Sandmen come.
+     *
+     * @VisibleForTesting
+     */
+    long getLostTimestampMillis() {
+        if (scanLostOverrideMillis >= 0) {
+            return getClock().currentTimeMillis() - scanLostOverrideMillis;
+        }
+        return getClock().currentTimeMillis() - (SCAN_LOST_CYCLES * getScanCycleMillis());
+    }
+
+    /**
+     * Returns the length of a single scan cycle, comprising both active and idle time.
+     *
+     * @VisibleForTesting
+     */
+    long getScanCycleMillis() {
+        return getScanActiveMillis() + getScanIdleMillis();
+    }
+
+    /**
+     * Get the current active ble scan time that has been set
+     *
+     * @VisibleForTesting
+     */
+    int getScanActiveMillis() {
+        return (overrideScanActiveMillis != -1) ? overrideScanActiveMillis : scanActiveMillis;
+    }
+
+    /**
+     * Get the current idle ble scan time that has been set
+     *
+     * @VisibleForTesting
+     */
+    int getScanIdleMillis() {
+        return (overrideScanActiveMillis != -1) ? overrideScanIdleMillis : scanIdleMillis;
+    }
+
+    /**
+     * Update the repeating alarm wake-up based on the period defined for the scanner If there are
+     * no clients, or a batch scan running, it will cancel the alarm.
+     */
+    protected void updateRepeatingAlarm() {
+        // Apply Scan Mode (Cycle Parameters)
+        setScanMode(getMaxPriorityScanMode());
+
+        if (!hasClients()) {
+            // No listeners.  Remove the repeating alarm, if there is one.
+            getAlarmManager().cancel(getAlarmIntent());
+            alarmIntervalMillis = 0;
+            Logger.logInfo("Scan : No clients left, canceling alarm.");
+        } else {
+            int idleMillis = getScanIdleMillis();
+            int scanPeriod = idleMillis + getScanActiveMillis();
+            if ((idleMillis != 0) && (alarmIntervalMillis != scanPeriod)) {
+                alarmIntervalMillis = scanPeriod;
+                // Specifies a repeating alarm at the scanPeriod, starting immediately.
+                getAlarmManager().setRepeating(AlarmManager.RTC_WAKEUP,
+                        0, alarmIntervalMillis,
+                        getAlarmIntent());
+                Logger.logInfo("Scan alarm setup complete @ " + System.currentTimeMillis());
+            }
+        }
+    }
+
+    /**
+     * Sets parameters for the various scan modes
+     *
+     * @param scanMode the ScanMode in BluetoothLeScanner Settings
+     */
+    protected void setScanMode(int scanMode) {
+        switch (scanMode) {
+            case ScanSettings.SCAN_MODE_LOW_LATENCY:
+                scanIdleMillis = LOW_LATENCY_IDLE_MILLIS;
+                scanActiveMillis = LOW_LATENCY_ACTIVE_MILLIS;
+                break;
+            case ScanSettings.SCAN_MODE_LOW_POWER:
+                scanIdleMillis = LOW_POWER_IDLE_MILLIS;
+                scanActiveMillis = LOW_POWER_ACTIVE_MILLIS;
+                break;
+
+            // Fall through and be balanced when there's nothing saying not to.
+            default:
+            case ScanSettings.SCAN_MODE_BALANCED:
+                scanIdleMillis = BALANCED_IDLE_MILLIS;
+                scanActiveMillis = BALANCED_ACTIVE_MILLIS;
+                break;
+        }
+    }
+
+    protected abstract Clock getClock();
+
+    protected abstract int getMaxPriorityScanMode();
+
+    protected abstract boolean hasClients();
+
+    protected abstract AlarmManager getAlarmManager();
+
+    protected abstract PendingIntent getAlarmIntent();
+
+    protected abstract void onNewScanCycle();
 }

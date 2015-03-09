@@ -14,9 +14,6 @@ package com.reelyactive.blesdk.support.ble;/*
  * limitations under the License.
  */
 
-import static android.content.Context.ALARM_SERVICE;
-import static android.content.Context.BLUETOOTH_SERVICE;
-
 import android.annotation.TargetApi;
 import android.app.AlarmManager;
 import android.bluetooth.BluetoothAdapter;
@@ -24,6 +21,9 @@ import android.bluetooth.BluetoothManager;
 import android.content.Context;
 import android.os.Build;
 import android.support.annotation.Nullable;
+
+import static android.content.Context.ALARM_SERVICE;
+import static android.content.Context.BLUETOOTH_SERVICE;
 
 /**
  * A compatibility layer for low-energy bluetooth, providing access to an implementation of
@@ -36,68 +36,66 @@ import android.support.annotation.Nullable;
  */
 public class BluetoothLeScannerCompatProvider {
 
-  private static BluetoothLeScannerCompat scannerInstance;
-  private static boolean allowHardware = true;
+    private static BluetoothLeScannerCompat scannerInstance;
+    private static boolean allowHardware = true;
 
-  private BluetoothLeScannerCompatProvider() {
-  }
-
-  /**
-   * Creates a {@link BluetoothLeScannerCompat} that works with the version of Android being used.
-   * <p>
-   * For Android versions between Jelly Bean MR2 and "L", a compatibility layer will be used to
-   * provide functionality that will be available in "L". For Android versions "L" and later, the
-   * native functionality will be used.
-   *
-   * @param context The Android context of the application.
-   * @return A {@link BluetoothLeScannerCompat} best fitting the version of Android. If no scanner
-   *         can be found, null will be returned.
-   */
-  @Nullable
-  public static synchronized BluetoothLeScannerCompat getBluetoothLeScannerCompat(Context context) {
-    return getBluetoothLeScannerCompat(context, true);
-  }
-
-   /**
-   * Creates a {@link BluetoothLeScannerCompat}, providing either a compatibility layer or
-   * access to native functionality available in "L".
-   * <p/>
-   *
-   * @param context         The Android context of the application.
-   * @param canUseNativeApi Whether or not to enable "L" hardware support, if available.
-   * @return A {@link BluetoothLeScannerCompat}. If no scanner can be found, null will be returned.
-   */
-  @Nullable
-  public static synchronized BluetoothLeScannerCompat getBluetoothLeScannerCompat(
-          Context context, boolean canUseNativeApi) {
-    if (scannerInstance == null) {
-      BluetoothManager bluetoothManager =
-              (BluetoothManager) context.getSystemService(BLUETOOTH_SERVICE);
-      AlarmManager alarmManager = (AlarmManager) context.getSystemService(ALARM_SERVICE);
-
-      if (bluetoothManager != null) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP
-                && canUseNativeApi
-                && areHardwareFeaturesSupported(bluetoothManager)) {
-          scannerInstance = new LBluetoothLeScannerCompat(bluetoothManager);
-        } else if (alarmManager != null
-                && Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
-          scannerInstance = new JbBluetoothLeScannerCompat(
-                  context, bluetoothManager, alarmManager);
-        }
-      }
+    private BluetoothLeScannerCompatProvider() {
     }
-    return scannerInstance;
-  }
 
-  /**
-   * Check that the hardware has indeed the features used by the L-specific implementation.
-   */
-  @TargetApi(Build.VERSION_CODES.LOLLIPOP)
-  private static boolean areHardwareFeaturesSupported(BluetoothManager bluetoothManager) {
-    BluetoothAdapter bluetoothAdapter = bluetoothManager.getAdapter();
-    return bluetoothAdapter != null
-            && bluetoothAdapter.isOffloadedFilteringSupported()
-            && bluetoothAdapter.isOffloadedScanBatchingSupported();
-  }
+    /**
+     * Creates a {@link BluetoothLeScannerCompat} that works with the version of Android being used.
+     * <p/>
+     * For Android versions between Jelly Bean MR2 and "L", a compatibility layer will be used to
+     * provide functionality that will be available in "L". For Android versions "L" and later, the
+     * native functionality will be used.
+     *
+     * @param context The Android context of the application.
+     * @return A {@link BluetoothLeScannerCompat} best fitting the version of Android. If no scanner
+     * can be found, null will be returned.
+     */
+    @Nullable
+    public static synchronized BluetoothLeScannerCompat getBluetoothLeScannerCompat(Context context) {
+        return getBluetoothLeScannerCompat(context, true);
+    }
+
+    /**
+     * Creates a {@link BluetoothLeScannerCompat}, providing either a compatibility layer or
+     * access to native functionality available in "L".
+     * <p/>
+     *
+     * @param context         The Android context of the application.
+     * @param canUseNativeApi Whether or not to enable "L" hardware support, if available.
+     * @return A {@link BluetoothLeScannerCompat}. If no scanner can be found, null will be returned.
+     */
+    @Nullable
+    public static synchronized BluetoothLeScannerCompat getBluetoothLeScannerCompat(
+            Context context, boolean canUseNativeApi) {
+        if (scannerInstance == null) {
+            BluetoothManager bluetoothManager = (BluetoothManager) context.getSystemService(BLUETOOTH_SERVICE);
+            AlarmManager alarmManager = (AlarmManager) context.getSystemService(ALARM_SERVICE);
+
+            if (bluetoothManager != null) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP
+                        && canUseNativeApi
+                        && areHardwareFeaturesSupported(bluetoothManager)) {
+                    scannerInstance = new LBluetoothLeScannerCompat(context, bluetoothManager, alarmManager);
+                } else if (alarmManager != null
+                        && Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
+                    scannerInstance = new JbBluetoothLeScannerCompat(context, bluetoothManager, alarmManager);
+                }
+            }
+        }
+        return scannerInstance;
+    }
+
+    /**
+     * Check that the hardware has indeed the features used by the L-specific implementation.
+     */
+    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
+    private static boolean areHardwareFeaturesSupported(BluetoothManager bluetoothManager) {
+        BluetoothAdapter bluetoothAdapter = bluetoothManager.getAdapter();
+        return bluetoothAdapter != null
+                && bluetoothAdapter.isOffloadedFilteringSupported()
+                && bluetoothAdapter.isOffloadedScanBatchingSupported();
+    }
 }

@@ -16,14 +16,20 @@ package com.reelyactive.blesdk.support.ble;
  */
 
 import android.annotation.TargetApi;
+import android.app.AlarmManager;
+import android.app.PendingIntent;
 import android.bluetooth.BluetoothManager;
+import android.content.Context;
+import android.content.Intent;
 import android.os.Build;
 
+import com.reelyactive.blesdk.support.ble.util.Clock;
 import com.reelyactive.blesdk.support.ble.util.Logger;
+import com.reelyactive.blesdk.support.ble.util.SystemClock;
 
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -35,8 +41,13 @@ import java.util.concurrent.TimeUnit;
 @TargetApi(Build.VERSION_CODES.LOLLIPOP)
 class LBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
 
-    private final Map<ScanCallback, android.bluetooth.le.ScanCallback> callbacksMap =
-            new HashMap<ScanCallback, android.bluetooth.le.ScanCallback>();
+    // Alarm Scan variables
+    private final Clock clock;
+    private final AlarmManager alarmManager;
+    private final PendingIntent alarmIntent;
+
+    private final Map<ScanCallback, ScanClient> callbacksMap =
+            new HashMap<ScanCallback, ScanClient>();
     private final android.bluetooth.le.BluetoothLeScanner osScanner;
 
     /**
@@ -44,24 +55,19 @@ class LBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
      * <p/>
      * Cannot be called from emulated devices that don't implement a BluetoothAdapter.
      */
-    LBluetoothLeScannerCompat(BluetoothManager manager) {
-        Logger.logInfo("BLE 'L' hardware access layer activated");
+    LBluetoothLeScannerCompat(Context context, BluetoothManager manager, AlarmManager alarmManager) {
+        this(manager, alarmManager, new SystemClock(),
+                PendingIntent.getBroadcast(context, 0 /* requestCode */,
+                        new Intent(context, ScanWakefulBroadcastReceiver.class).putExtra(ScanWakefulService.EXTRA_USE_LOLLIPOP_API, true), 0 /* flags */));
+    }
+
+    LBluetoothLeScannerCompat(BluetoothManager manager, AlarmManager alarmManager,
+                              Clock clock, PendingIntent alarmIntent) {
+        Logger.logError("BLE 'L' hardware access layer activated", new Exception());
         this.osScanner = manager.getAdapter().getBluetoothLeScanner();
-    }
-
-    /**
-     * Private constructor for testing purposes.
-     */
-    private LBluetoothLeScannerCompat() {
-        this.osScanner = null;
-    }
-
-    /**
-     * Returns an instance of this class to tests. Useful only for validating that this file
-     * can compile against the underlying L API.
-     */
-    static LBluetoothLeScannerCompat createForTests() {
-        return new LBluetoothLeScannerCompat();
+        this.alarmManager = alarmManager;
+        this.clock = clock;
+        this.alarmIntent = alarmIntent;
     }
 
     @Override
@@ -72,13 +78,14 @@ class LBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
         }
 
         android.bluetooth.le.ScanSettings osSettings = toOs(settings);
-        android.bluetooth.le.ScanCallback osCallback = toOs(callback);
+        ScanClient osCallback = toOs(callback, settings);
         List<android.bluetooth.le.ScanFilter> osFilters = toOs(filters);
 
         callbacksMap.put(callback, osCallback);
         try {
             Logger.logInfo("Starting BLE 'L' hardware scan");
             osScanner.startScan(osFilters, osSettings, osCallback);
+            updateRepeatingAlarm();
             return true;
         } catch (Exception e) {
             Logger.logError("Exception caught calling 'L' BluetoothLeScanner.startScan()", e);
@@ -97,76 +104,70 @@ class LBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
             } catch (Exception e) {
                 Logger.logError("Exception caught calling 'L' BluetoothLeScanner.stopScan()", e);
             }
+            callbacksMap.remove(callback);
+            updateRepeatingAlarm();
         }
     }
 
     @Override
-    public void setCustomScanTiming(int scanMillis, int idleMillis, long serialScanDurationMillis) {
-        // Do nothing.  This operation is not supported, but calling it is not an error.
+    public Clock getClock() {
+        return clock;
+    }
+
+    private int getScanModePriority(int mode) {
+        switch (mode) {
+            case ScanSettings.SCAN_MODE_LOW_LATENCY:
+                return 2;
+            case ScanSettings.SCAN_MODE_BALANCED:
+                return 1;
+            case ScanSettings.SCAN_MODE_LOW_POWER:
+                return 0;
+            default:
+                Logger.logError("Unknown scan mode " + mode);
+                return 0;
+        }
+    }
+
+    protected int getMaxPriorityScanMode() {
+        int maxPriority = -1;
+
+        for (ScanClient scanClient : callbacksMap.values()) {
+            ScanSettings settings = scanClient.settings;
+            if (maxPriority == -1
+                    || getScanModePriority(settings.getScanMode()) > getScanModePriority(maxPriority)) {
+                maxPriority = settings.getScanMode();
+            }
+        }
+        return maxPriority;
     }
 
     @Override
-    public synchronized void setScanLostOverride(long lostOverrideMillis) {
-        // TODO: discuss w/ bentonian how best to implement this here.
+    protected boolean hasClients() {
+        return !callbacksMap.isEmpty();
+    }
+
+    @Override
+    protected AlarmManager getAlarmManager() {
+        return alarmManager;
+    }
+
+    @Override
+    protected PendingIntent getAlarmIntent() {
+        return alarmIntent;
     }
 
     /////////////////////////////////////////////////////////////////////////////
     // Conversion methods
 
     private static android.bluetooth.le.ScanSettings toOs(ScanSettings settings) {
-        android.bluetooth.le.ScanSettings.Builder builder =
-                new android.bluetooth.le.ScanSettings.Builder()
-                        .setReportDelay(settings.getReportDelayMillis())
-                        .setScanMode(settings.getScanMode());
-
-        // <hack>
-        // Hack to access @SystemApi-hidden method to set scan result type and callback type.
-        // Eclipse doesn't recognize these methods (yet). To track changes to this, keep an eye on
-        // http://cs/#android/frameworks/base/core/java/android/bluetooth/le/com.reelyactive.blesdk.support.ble.ScanSettings.java
-        // TODO: Remove--or at least never commit to gcore.
-        Class<?> clazz = builder.getClass();
-        boolean resultTypeSet = false;
-        boolean callbackTypeSet = false;
-        try {
-            for (Method method : clazz.getMethods()) {
-                if (method.toString().contains(".setScanResultType(")) {
-                    method.invoke(builder, settings.getScanResultType());
-                    resultTypeSet = true;
-                }
-                if (method.toString().contains(".setCallbackType(")) {
-                    method.invoke(builder, settings.getCallbackType());
-                    callbackTypeSet = true;
-                }
-                if (resultTypeSet && callbackTypeSet) {
-                    break;
-                }
-            }
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-        if (!resultTypeSet && !callbackTypeSet) {
-            throw new RuntimeException(
-                    "Failed to find setScanResultType() and setCallbackType() via reflection");
-        }
-        // </hack>
-
-        return builder.build();
+        return new android.bluetooth.le.ScanSettings.Builder()
+                .setReportDelay(settings.getReportDelayMillis())
+                .setScanMode(settings.getScanMode())
+                .build();
     }
 
-    private static android.bluetooth.le.ScanCallback toOs(final ScanCallback callback) {
-        return new android.bluetooth.le.ScanCallback() {
-
-            @Override
-            public void onScanResult(int callbackType, android.bluetooth.le.ScanResult osResult) {
-                callback.onScanResult(callbackType, fromOs(osResult));
-            }
-
-            @Override
-            public void onScanFailed(int errorCode) {
-                Logger.logInfo("LBluetoothLeScannerCompat::onScanFailed(" + errorCode + ")");
-                callback.onScanFailed(errorCode);
-            }
-        };
+    private static ScanClient toOs(final ScanCallback callback, ScanSettings settings) {
+        return new ScanClient(callback, settings);
     }
 
     private static List<android.bluetooth.le.ScanFilter> toOs(List<ScanFilter> filters) {
@@ -241,5 +242,73 @@ class LBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
 
     private static boolean isNullOrEmpty(String s) {
         return (s == null) || s.isEmpty();
+    }
+
+    @Override
+    protected void onNewScanCycle() {
+        Iterator<Map.Entry<ScanCallback, ScanClient>> iter = callbacksMap.entrySet().iterator();
+        long lostTimestampMillis = getLostTimestampMillis();
+        while (iter.hasNext()) {
+            Map.Entry<ScanCallback, ScanClient> entry = iter.next();
+            ScanClient client = (ScanClient) entry.getValue();
+            Iterator<Map.Entry<String, ScanResult>> addresses = client.addressesSeen.entrySet().iterator();
+            while (addresses.hasNext()) {
+                Map.Entry<String, ScanResult> addrEntry = addresses.next();
+                String address = addrEntry.getKey();
+                ScanResult savedResult = addrEntry.getValue();
+                if (TimeUnit.NANOSECONDS.toMillis(savedResult.getTimestampNanos()) < lostTimestampMillis) {
+                    try {
+                        client.callback.onScanResult(ScanSettings.CALLBACK_TYPE_MATCH_LOST, savedResult);
+                    } catch (Exception e) {
+                        Logger.logError("Failure while sending 'lost' scan result to listener", e);
+                    }
+                    client.addressesSeen.remove(address);
+                }
+            }
+        }
+    }
+
+    private static class ScanClient extends android.bluetooth.le.ScanCallback {
+        final HashMap<String, ScanResult> addressesSeen;
+        final ScanCallback callback;
+        final ScanSettings settings;
+
+        ScanClient(ScanCallback callback, ScanSettings settings) {
+            this.settings = settings;
+            this.addressesSeen = new HashMap<String, ScanResult>();
+            this.callback = callback;
+        }
+
+        @Override
+        public void onScanResult(int callbackType, android.bluetooth.le.ScanResult osResult) {
+            String address = osResult.getDevice().getAddress();
+            boolean seenItBefore = addressesSeen.containsKey(address);
+            int clientFlags = settings.getCallbackType();
+
+            int firstMatchBit = clientFlags & ScanSettings.CALLBACK_TYPE_FIRST_MATCH;
+            int allMatchesBit = clientFlags & ScanSettings.CALLBACK_TYPE_ALL_MATCHES;
+
+            ScanResult result = fromOs(osResult);
+
+            // Catch any exceptions and log them but continue processing other listeners.
+            if ((firstMatchBit | allMatchesBit) != 0) {
+                try {
+                    if (!seenItBefore) {
+                        callback.onScanResult(ScanSettings.CALLBACK_TYPE_FIRST_MATCH, result);
+                    } else if (allMatchesBit != 0) {
+                        callback.onScanResult(ScanSettings.CALLBACK_TYPE_ALL_MATCHES, result);
+                    }
+                } catch (Exception e) {
+                    Logger.logError("Failure while handling scan result", e);
+                }
+            }
+            addressesSeen.put(address, result);
+        }
+
+        @Override
+        public void onScanFailed(int errorCode) {
+            Logger.logInfo("LBluetoothLeScannerCompat::onScanFailed(" + errorCode + ")");
+            callback.onScanFailed(errorCode);
+        }
     }
 }

@@ -54,21 +54,6 @@ import java.util.concurrent.TimeUnit;
  * @see <a href="http://go/ble-glossary">BLE Glossary</a>
  */
 class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
-    // Number of cycles before a sighted device is considered lost.
-  /* @VisibleForTesting */ static final int SCAN_LOST_CYCLES = 4;
-
-    // Constants for Scan Cycle
-    // Low Power: 2.5 minute period with 1.5 seconds active (1% duty cycle)
-  /* @VisibleForTesting */ static final int LOW_POWER_IDLE_MILLIS = 148500;
-    /* @VisibleForTesting */ static final int LOW_POWER_ACTIVE_MILLIS = 1500;
-
-    // Balanced: 15 second period with 1.5 second active (10% duty cycle)
-  /* @VisibleForTesting */ static final int BALANCED_IDLE_MILLIS = 13500;
-    /* @VisibleForTesting */ static final int BALANCED_ACTIVE_MILLIS = 1500;
-
-    // Low Latency: 1.67 second period with 1.5 seconds active (90% duty cycle)
-  /* @VisibleForTesting */ static final int LOW_LATENCY_IDLE_MILLIS = 167;
-    /* @VisibleForTesting */ static final int LOW_LATENCY_ACTIVE_MILLIS = 1500;
 
     /**
      * Wraps user requests and stores the list of filters and callbacks. Also saves a set of
@@ -92,23 +77,10 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
     private final Clock clock;
     private final AlarmManager alarmManager;
     private final PendingIntent alarmIntent;
-    private long alarmIntervalMillis;
 
     // Map of BD_ADDR->com.reelyactive.blesdk.support.ble.ScanResult for replay to new registrations.
     // Entries are evicted after SCAN_LOST_CYCLES cycles.
   /* @VisibleForTesting */ final HashMap<String, ScanResult> recentScanResults;
-
-    // Default Scan Constants = Balanced
-    private int scanIdleMillis = BALANCED_IDLE_MILLIS;
-    private int scanActiveMillis = BALANCED_ACTIVE_MILLIS;
-
-    // Override values for scan window
-    private int overrideScanActiveMillis = -1;
-    private int overrideScanIdleMillis;
-
-    // Milliseconds to wait before considering a device lost. If set to a negative number
-    // SCAN_LOST_CYCLES is used to determine when to inform clients about lost events.
-    private long scanLostOverrideMillis = -1;
 
     private final BluetoothAdapter bluetoothAdapter;
     /* @VisibleForTesting */ final HashMap<ScanCallback, ScanClient> serialClients;
@@ -147,7 +119,7 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
             Context context, BluetoothManager manager, AlarmManager alarmManager) {
         this(manager, alarmManager, new SystemClock(),
                 PendingIntent.getBroadcast(context, 0 /* requestCode */,
-                        new Intent(context, ScanWakefulBroadcastReceiver.class), 0 /* flags */));
+                        new Intent(context, ScanWakefulBroadcastReceiver.class).putExtra(ScanWakefulService.EXTRA_USE_LOLLIPOP_API, false), 0 /* flags */));
         this.crashResolver = new BluetoothCrashResolver(context);
         this.crashResolver.start();
     }
@@ -159,6 +131,7 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
      */
     JbBluetoothLeScannerCompat(BluetoothManager manager, AlarmManager alarmManager,
                                Clock clock, PendingIntent alarmIntent) {
+        Logger.logError("BLE 'JB' hardware access layer activated", new Exception());
         this.bluetoothAdapter = manager.getAdapter();
         this.serialClients = new HashMap<ScanCallback, ScanClient>();
         this.recentScanResults = new HashMap<String, ScanResult>();
@@ -304,28 +277,9 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
         return true;
     }
 
-    /**
-     * Global override for scan window. This separately supersedes settings from all scan clients.
-     *
-     * @param scanMillis               -1 to remove override, 0 to pause scan, or a positive number
-     * @param idleMillis               a positive number
-     * @param serialScanDurationMillis not used in this scanner
-     */
     @Override
-    public synchronized void setCustomScanTiming(
-            int scanMillis, int idleMillis, long serialScanDurationMillis) {
-        overrideScanActiveMillis = scanMillis;
-        overrideScanIdleMillis = idleMillis;
-        // reset scanner so it picks up new scan window values
-        updateRepeatingAlarm();
-    }
-
-    /**
-     * Sets the time after which a sighted device will be marked as lost.
-     */
-    @Override
-    public synchronized void setScanLostOverride(long scanLostOverrideMillis) {
-        this.scanLostOverrideMillis = scanLostOverrideMillis;
+    public Clock getClock() {
+        return clock;
     }
 
     /**
@@ -345,7 +299,7 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
      *
      * @VisibleForTesting
      */
-    void onScanCycleComplete() {
+    protected void onScanCycleComplete() {
         Iterator<Entry<String, ScanResult>> iter = recentScanResults.entrySet().iterator();
         long lostTimestampMillis = getLostTimestampMillis();
 
@@ -361,30 +315,6 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
         }
     }
 
-    /**
-     * Sets parameters for the various scan modes
-     *
-     * @param scanMode the ScanMode in BluetoothLeScanner Settings
-     */
-    private void setScanMode(int scanMode) {
-        switch (scanMode) {
-            case ScanSettings.SCAN_MODE_LOW_LATENCY:
-                scanIdleMillis = LOW_LATENCY_IDLE_MILLIS;
-                scanActiveMillis = LOW_LATENCY_ACTIVE_MILLIS;
-                break;
-            case ScanSettings.SCAN_MODE_LOW_POWER:
-                scanIdleMillis = LOW_POWER_IDLE_MILLIS;
-                scanActiveMillis = LOW_POWER_ACTIVE_MILLIS;
-                break;
-
-            // Fall through and be balanced when there's nothing saying not to.
-            default:
-            case ScanSettings.SCAN_MODE_BALANCED:
-                scanIdleMillis = BALANCED_IDLE_MILLIS;
-                scanActiveMillis = BALANCED_ACTIVE_MILLIS;
-                break;
-        }
-    }
 
     private int getScanModePriority(int mode) {
         switch (mode) {
@@ -400,7 +330,7 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
         }
     }
 
-    private int getMaxPriorityScanMode() {
+    protected int getMaxPriorityScanMode() {
         int maxPriority = -1;
 
         for (ScanClient scanClient : serialClients.values()) {
@@ -411,33 +341,6 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
             }
         }
         return maxPriority;
-    }
-
-    /**
-     * Update the repeating alarm wake-up based on the period defined for the scanner If there are
-     * no clients, or a batch scan running, it will cancel the alarm.
-     */
-    private void updateRepeatingAlarm() {
-        // Apply Scan Mode (Cycle Parameters)
-        setScanMode(getMaxPriorityScanMode());
-
-        if (serialClients.isEmpty()) {
-            // No listeners.  Remove the repeating alarm, if there is one.
-            alarmManager.cancel(alarmIntent);
-            alarmIntervalMillis = 0;
-            Logger.logInfo("Scan : No clients left, canceling alarm.");
-        } else {
-            int idleMillis = getScanIdleMillis();
-            int scanPeriod = idleMillis + getScanActiveMillis();
-            if ((idleMillis != 0) && (alarmIntervalMillis != scanPeriod)) {
-                alarmIntervalMillis = scanPeriod;
-                // Specifies a repeating alarm at the scanPeriod, starting immediately.
-                alarmManager.setRepeating(AlarmManager.RTC_WAKEUP,
-                        0, alarmIntervalMillis,
-                        alarmIntent);
-                Logger.logInfo("Scan alarm setup complete @ " + System.currentTimeMillis());
-            }
-        }
     }
 
     private static boolean matchesAnyFilter(List<ScanFilter> filters, ScanResult result) {
@@ -460,44 +363,23 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
         return TimeUnit.NANOSECONDS.toMillis(clock.elapsedRealtimeNanos());
     }
 
-    /**
-     * Compute the timestamp in the past which is the earliest that a sighting can have been
-     * seen; sightings last seen before this timestamp will be deemed to be too old.
-     * Then the Sandmen come.
-     *
-     * @VisibleForTesting
-     */
-    long getLostTimestampMillis() {
-        if (scanLostOverrideMillis >= 0) {
-            return clock.currentTimeMillis() - scanLostOverrideMillis;
-        }
-        return clock.currentTimeMillis() - (SCAN_LOST_CYCLES * getScanCycleMillis());
+    @Override
+    protected boolean hasClients() {
+        return !serialClients.isEmpty();
     }
 
-    /**
-     * Returns the length of a single scan cycle, comprising both active and idle time.
-     *
-     * @VisibleForTesting
-     */
-    long getScanCycleMillis() {
-        return getScanActiveMillis() + getScanIdleMillis();
+    @Override
+    protected AlarmManager getAlarmManager() {
+        return alarmManager;
     }
 
-    /**
-     * Get the current active ble scan time that has been set
-     *
-     * @VisibleForTesting
-     */
-    int getScanActiveMillis() {
-        return (overrideScanActiveMillis != -1) ? overrideScanActiveMillis : scanActiveMillis;
+    @Override
+    protected PendingIntent getAlarmIntent() {
+        return alarmIntent;
     }
 
-    /**
-     * Get the current idle ble scan time that has been set
-     *
-     * @VisibleForTesting
-     */
-    int getScanIdleMillis() {
-        return (overrideScanActiveMillis != -1) ? overrideScanIdleMillis : scanIdleMillis;
+    @Override
+    protected void onNewScanCycle() {
+        blockingScanCycle();
     }
 }
