@@ -29,26 +29,26 @@ import java.util.List;
 /**
  * Represents the public entry into the Bluetooth LE compatibility scanner that efficiently captures
  * advertising packets broadcast from Bluetooth LE devices.
- * <p>
+ * <p/>
  * API declarations in this class are the same as the new LE scanning API that is being introduced
  * in Android "L" platform. Declarations contained here will eventually be replaced by the platform
  * versions. Refer to the <a href="http://go/android-ble">"L" release API design</a> for further
  * information.
- * <p>
+ * <p/>
  * The API implemented here is for compatibility when used on
  * {@link android.os.Build.VERSION_CODES#JELLY_BEAN_MR2} and later.
  *
  * @see <a href="https://www.bluetooth.org/en-us/specification/adopted-specifications"> Bluetooth
- *      Adopted Specifications</a>
+ * Adopted Specifications</a>
  * @see <a href="https://www.bluetooth.org/DocMan/handlers/DownloadDoc.ashx?doc_id=282152"> ​Core
- *      Specification Supplement (CSS) v4</a>
+ * Specification Supplement (CSS) v4</a>
  */
 public abstract class BluetoothLeScannerCompat {
 
     /**
      * Start Bluetooth LE scan with default parameters and no filters.
      * The scan results will be delivered through {@code callback}.
-     * <p>
+     * <p/>
      * Requires {@link android.Manifest.permission#BLUETOOTH_ADMIN} permission.
      *
      * @param callback Callback used to deliver scan results.
@@ -65,34 +65,34 @@ public abstract class BluetoothLeScannerCompat {
      * Starts a scan for Bluetooth LE devices, looking for device advertisements that match the
      * given filters.  Attempts to start scans more than once with the same com.reelyactive.blesdk.support.ble.ScanCallback instance
      * will fail and return {@code false}.
-     * <p>
+     * <p/>
      * Due to the resource limitations in BLE chipset, an app cannot add more than N(real number
      * TBD) filters.
-     * <p>
+     * <p/>
      * Once the controller storage reaches its limitation on scan filters, the framework will try to
      * merge the existing scan filters and set the merged filters to chipset. The framework will
      * need to keep a copy of the original scan filters to make sure each app gets only its desired
      * results.
-     * <p>
+     * <p/>
      * The callback will be invoked when LE scan finds a matching BLE advertising packet. A BLE
      * advertising record is considered matching the filters if it matches any of the
      * BluetoothLeScanFilter in the list.
-     * <p>
+     * <p/>
      * Results of the scan are reported using the onResult(List<com.reelyactive.blesdk.support.ble.ScanResult>) callback.
-     * <p>
+     * <p/>
      * Requires BLUETOOTH_ADMIN permission.
-     * <p>
+     * <p/>
      *
      * @return true if the scan starts successfully, false otherwise.
      */
     public abstract boolean startScan(List<ScanFilter> filters, ScanSettings settings,
-            ScanCallback callback);
+                                      ScanCallback callback);
 
     /**
      * Stops an ongoing Bluetooth LE device scan.
-     * <p>
+     * <p/>
      * Requires BLUETOOTH_ADMIN permission.
-     * <p>
+     * <p/>
      *
      * @param callback
      */
@@ -101,20 +101,20 @@ public abstract class BluetoothLeScannerCompat {
     /**
      * Sets the Bluetooth LE scan cycle overriding values set on individual scans from
      * {@link ScanSettings}.
-     * <p>
+     * <p/>
      * This is an extension of the "L" Platform API.
-     * <p>
+     * <p/>
      *
-     * @param scanMillis duration in milliseconds for the scan to be active, or -1 to remove, 0 to
-     *        pause.  Ignored by hardware and truncated batch scanners.
-     * @param idleMillis duration in milliseconds for the scan to be idle.  Ignored by hardware
-     *        and truncated batch scanners.
+     * @param scanMillis               duration in milliseconds for the scan to be active, or -1 to remove, 0 to
+     *                                 pause.  Ignored by hardware and truncated batch scanners.
+     * @param idleMillis               duration in milliseconds for the scan to be idle.  Ignored by hardware
+     *                                 and truncated batch scanners.
      * @param serialScanDurationMillis duration in milliseconds of the on-demand serial scan
-     *        launched opportunistically by the truncated batch mode scanner.  Ignored by
-     *        non-truncated scanners.
+     *                                 launched opportunistically by the truncated batch mode scanner.  Ignored by
+     *                                 non-truncated scanners.
      */
     public abstract void setCustomScanTiming(
-        int scanMillis, int idleMillis, long serialScanDurationMillis);
+            int scanMillis, int idleMillis, long serialScanDurationMillis);
 
     /**
      * Sets the delay after which a device will be marked as lost if it hasn't been sighted
