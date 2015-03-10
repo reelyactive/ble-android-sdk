@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">BleScanner</string>
+    <string name="start_ble_scan">Start scan</string>
+    <string name="stop_ble_scan">Stop scan</string>
+
+</resources>

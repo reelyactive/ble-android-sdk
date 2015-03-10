@@ -22,6 +22,8 @@ import android.bluetooth.BluetoothManager;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 
 import com.reelyactive.blesdk.support.ble.util.Clock;
 import com.reelyactive.blesdk.support.ble.util.Logger;
@@ -63,7 +65,7 @@ class LBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
 
     LBluetoothLeScannerCompat(BluetoothManager manager, AlarmManager alarmManager,
                               Clock clock, PendingIntent alarmIntent) {
-        Logger.logError("BLE 'L' hardware access layer activated", new Exception());
+        Logger.logDebug("BLE 'L' hardware access layer activated");
         this.osScanner = manager.getAdapter().getBluetoothLeScanner();
         this.alarmManager = alarmManager;
         this.clock = clock;
@@ -246,26 +248,31 @@ class LBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
 
     @Override
     protected void onNewScanCycle() {
-        Iterator<Map.Entry<ScanCallback, ScanClient>> iter = callbacksMap.entrySet().iterator();
-        long lostTimestampMillis = getLostTimestampMillis();
-        while (iter.hasNext()) {
-            Map.Entry<ScanCallback, ScanClient> entry = iter.next();
-            ScanClient client = (ScanClient) entry.getValue();
-            Iterator<Map.Entry<String, ScanResult>> addresses = client.addressesSeen.entrySet().iterator();
-            while (addresses.hasNext()) {
-                Map.Entry<String, ScanResult> addrEntry = addresses.next();
-                String address = addrEntry.getKey();
-                ScanResult savedResult = addrEntry.getValue();
-                if (TimeUnit.NANOSECONDS.toMillis(savedResult.getTimestampNanos()) < lostTimestampMillis) {
-                    try {
-                        client.callback.onScanResult(ScanSettings.CALLBACK_TYPE_MATCH_LOST, savedResult);
-                    } catch (Exception e) {
-                        Logger.logError("Failure while sending 'lost' scan result to listener", e);
+        new Handler(Looper.getMainLooper()).post(new Runnable() {
+            @Override
+            public void run() {
+                Iterator<Map.Entry<ScanCallback, ScanClient>> iter = callbacksMap.entrySet().iterator();
+                long lostTimestampMillis = getLostTimestampMillis();
+                while (iter.hasNext()) {
+                    Map.Entry<ScanCallback, ScanClient> entry = iter.next();
+                    ScanClient client = (ScanClient) entry.getValue();
+                    Iterator<Map.Entry<String, ScanResult>> addresses = client.addressesSeen.entrySet().iterator();
+                    while (addresses.hasNext()) {
+                        Map.Entry<String, ScanResult> addrEntry = addresses.next();
+                        String address = addrEntry.getKey();
+                        ScanResult savedResult = addrEntry.getValue();
+                        if (TimeUnit.NANOSECONDS.toMillis(savedResult.getTimestampNanos()) < lostTimestampMillis) {
+                            try {
+                                client.callback.onScanResult(ScanSettings.CALLBACK_TYPE_MATCH_LOST, savedResult);
+                            } catch (Exception e) {
+                                Logger.logError("Failure while sending 'lost' scan result to listener", e);
+                            }
+                            client.addressesSeen.remove(address);
+                        }
                     }
-                    client.addressesSeen.remove(address);
                 }
             }
-        }
+        });
     }
 
     private static class ScanClient extends android.bluetooth.le.ScanCallback {

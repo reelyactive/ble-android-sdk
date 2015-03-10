@@ -1,2 +1,3 @@
 include ':library'
 project(':library').name = 'blesdk'
+include ':example_app'

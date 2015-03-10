@@ -21,6 +21,8 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
 import android.content.Context;
 import android.content.Intent;
+import android.os.Handler;
+import android.os.Looper;
 
 import com.reelyactive.blesdk.support.ble.util.Clock;
 import com.reelyactive.blesdk.support.ble.util.Logger;
@@ -131,7 +133,7 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
      */
     JbBluetoothLeScannerCompat(BluetoothManager manager, AlarmManager alarmManager,
                                Clock clock, PendingIntent alarmIntent) {
-        Logger.logError("BLE 'JB' hardware access layer activated", new Exception());
+        Logger.logDebug("BLE 'JB' hardware access layer activated");
         this.bluetoothAdapter = manager.getAdapter();
         this.serialClients = new HashMap<ScanCallback, ScanClient>();
         this.recentScanResults = new HashMap<String, ScanResult>();
@@ -171,7 +173,12 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
                 }
                 // Active BLE scan ends
                 // Execute cycle complete to 1) detect lost devices
-                onScanCycleComplete();
+                new Handler(Looper.getMainLooper()).post(new Runnable() {
+                    @Override
+                    public void run() {
+                        onScanCycleComplete();
+                    }
+                });
             }
         }
         Logger.logDebug("Stopping BLE Active Scan Cycle.");
