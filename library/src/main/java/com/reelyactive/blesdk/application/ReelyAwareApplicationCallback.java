@@ -17,6 +17,7 @@ import android.util.Log;
 
 import com.reelyactive.blesdk.service.BleService;
 import com.reelyactive.blesdk.support.ble.ScanFilter;
+import com.reelyactive.blesdk.support.ble.ScanResult;
 
 import java.lang.ref.WeakReference;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -166,18 +167,30 @@ public class ReelyAwareApplicationCallback implements Application.ActivityLifecy
      *
      * @param event The {@link BleService.Event} received from the {@link BleService}.
      */
-    protected void onBleEvent(BleService.Event event) {
+    protected void onBleEvent(BleService.Event event, Object data) {
         switch (event) {
             case IN_REGION:
                 Log.d(TAG, "Application entered region");
                 if (isReelyAware(getCurrentActivity())) {
-                    ((ReelyAwareActivity) getCurrentActivity()).onEnterRegion();
+                    ((ReelyAwareActivity) getCurrentActivity()).onEnterRegion((ScanResult) data);
                 }
                 break;
             case OUT_REGION:
                 Log.d(TAG, "Application left region");
                 if (isReelyAware(getCurrentActivity())) {
-                    ((ReelyAwareActivity) getCurrentActivity()).onLeaveRegion();
+                    ((ReelyAwareActivity) getCurrentActivity()).onLeaveRegion((ScanResult) data);
+                }
+                break;
+            case SCAN_STARTED:
+                Log.d(TAG, "Scan started");
+                if (isReelyAware(getCurrentActivity())) {
+                    ((ReelyAwareActivity) getCurrentActivity()).onScanStarted();
+                }
+                break;
+            case SCAN_STOPPED:
+                Log.d(TAG, "Scan stopped");
+                if (isReelyAware(getCurrentActivity())) {
+                    ((ReelyAwareActivity) getCurrentActivity()).onScanStopped();
                 }
                 break;
             default:
@@ -283,7 +296,7 @@ public class ReelyAwareApplicationCallback implements Application.ActivityLifecy
             BleService.Event event = BleService.Event.fromOrdinal(msg.what);
             ReelyAwareApplicationCallback applicationCallback = callback.get();
             if (applicationCallback != null) {
-                applicationCallback.onBleEvent(event);
+                applicationCallback.onBleEvent(event, (ScanResult) msg.getData().getParcelable(BleService.KEY_EVENT_DATA));
             }
         }
     }

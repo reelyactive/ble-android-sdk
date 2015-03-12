@@ -248,6 +248,7 @@ class LBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
 
     @Override
     protected void onNewScanCycle() {
+
         new Handler(Looper.getMainLooper()).post(new Runnable() {
             @Override
             public void run() {
@@ -255,11 +256,10 @@ class LBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
                 long lostTimestampMillis = getLostTimestampMillis();
                 while (iter.hasNext()) {
                     Map.Entry<ScanCallback, ScanClient> entry = iter.next();
-                    ScanClient client = (ScanClient) entry.getValue();
+                    ScanClient client = entry.getValue();
                     Iterator<Map.Entry<String, ScanResult>> addresses = client.addressesSeen.entrySet().iterator();
                     while (addresses.hasNext()) {
                         Map.Entry<String, ScanResult> addrEntry = addresses.next();
-                        String address = addrEntry.getKey();
                         ScanResult savedResult = addrEntry.getValue();
                         if (TimeUnit.NANOSECONDS.toMillis(savedResult.getTimestampNanos()) < lostTimestampMillis) {
                             try {
@@ -267,7 +267,7 @@ class LBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
                             } catch (Exception e) {
                                 Logger.logError("Failure while sending 'lost' scan result to listener", e);
                             }
-                            client.addressesSeen.remove(address);
+                            addresses.remove();
                         }
                     }
                 }

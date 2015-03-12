@@ -1,11 +1,16 @@
 package com.reelyactive.blesdk.application;
 
+import com.reelyactive.blesdk.support.ble.ScanResult;
+
 /**
  * Implement this interface if you want your current activity to be notified when Reelceiver are detected.
- * // TODO Extend the possibilities, the API is too limited.
  */
 public interface ReelyAwareActivity {
-    public void onEnterRegion();
+    public void onScanStarted();
 
-    public void onLeaveRegion();
+    public void onScanStopped();
+
+    public void onEnterRegion(ScanResult beacon);
+
+    public void onLeaveRegion(ScanResult beacon);
 }

@@ -2,10 +2,12 @@ package com.reelyactive.blesdk.service;
 
 import android.app.Service;
 import android.content.Intent;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
 import android.os.Messenger;
+import android.os.Parcelable;
 import android.os.RemoteException;
 
 import com.reelyactive.blesdk.support.ble.BluetoothLeScannerCompat;
@@ -22,6 +24,7 @@ import hugo.weaving.DebugLog;
 
 public class BleService extends Service {
     public static final String KEY_FILTER = "filter";
+    public static final String KEY_EVENT_DATA = "event_data";
     /**
      * Keeps track of all current registered clients.
      */
@@ -89,6 +92,8 @@ public class BleService extends Service {
     }
 
     public static enum Event {
+        SCAN_STARTED,
+        SCAN_STOPPED,
         IN_REGION,
         OUT_REGION,
         UNKNOWN;
@@ -192,7 +197,8 @@ public class BleService extends Service {
         nextSettings = nextSettings == null ? lowPowerScan : nextSettings;
         nextFilter = nextFilter == null ? (currentFilter == null ? new ScanFilter.Builder().build() : currentFilter) : nextFilter;
         if (currentSettings != nextSettings || nextFilter != currentFilter) {
-            scanner.stopScan(callback);
+            stopScan();
+            notifyEvent(Event.SCAN_STARTED);
             scanner.startScan(Arrays.asList(nextFilter), nextSettings, callback); // TODO make it possible to scan using more filters
         }
         currentSettings = nextSettings;
@@ -202,22 +208,33 @@ public class BleService extends Service {
     @DebugLog
     private void stopScan() {
         scanner.stopScan(callback);
+        notifyEvent(Event.SCAN_STOPPED);
+    }
+
+    private void notifyEvent(Event event, Parcelable... data) {
+        Message msg = Message.obtain(null, event.ordinal());
+        if (data != null && data.length == 1) {
+            Bundle bundle = new Bundle();
+            bundle.putParcelable(KEY_EVENT_DATA, data[0]);
+            msg.setData(bundle);
+        }
+        for (int i = mClients.size() - 1; i >= 0; i--) {
+            try {
+                mClients.get(i).send(msg);
+            } catch (RemoteException e) {
+                // The client is dead.  Remove it from the list;
+                // we are going through the list from back to front
+                // so this is safe to do inside the loop.
+                mClients.remove(i);
+            }
+        }
     }
 
     class ScanCallback extends com.reelyactive.blesdk.support.ble.ScanCallback {
         @Override
         @DebugLog
         public void onScanResult(int callbackType, ScanResult result) {
-            for (int i = mClients.size() - 1; i >= 0; i--) {
-                try {
-                    mClients.get(i).send(Message.obtain(null, callbackType != ScanSettings.CALLBACK_TYPE_MATCH_LOST ? Event.IN_REGION.ordinal() : Event.OUT_REGION.ordinal()));
-                } catch (RemoteException e) {
-                    // The client is dead.  Remove it from the list;
-                    // we are going through the list from back to front
-                    // so this is safe to do inside the loop.
-                    mClients.remove(i);
-                }
-            }
+            notifyEvent(callbackType != ScanSettings.CALLBACK_TYPE_MATCH_LOST ? Event.IN_REGION : Event.OUT_REGION, result);
         }
     }
 }
