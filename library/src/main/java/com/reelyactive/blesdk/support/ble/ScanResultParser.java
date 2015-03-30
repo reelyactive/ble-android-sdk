@@ -3,6 +3,7 @@ package com.reelyactive.blesdk.support.ble;
 /**
  * Created by saiimons on 15-03-30.
  */
+@SuppressWarnings("unused")
 public class ScanResultParser {
     public static String getSystemId(ScanResult result) {
         byte[] data = getSystemIdBytes(result);
@@ -17,6 +18,9 @@ public class ScanResultParser {
     }
 
     public static byte[] getSystemIdBytes(ScanResult result) {
+        if (result == null) {
+            return null;
+        }
         ScanRecord record = result.getScanRecord();
         if (record == null) {
             return null;

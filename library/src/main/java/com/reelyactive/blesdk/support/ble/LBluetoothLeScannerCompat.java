@@ -318,6 +318,7 @@ class LBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
             int allMatchesBit = clientFlags & ScanSettings.CALLBACK_TYPE_ALL_MATCHES;
 
             ScanResult result = fromOs(osResult);
+            recentScanResults.put(address, result);
 
             // Catch any exceptions and log them but continue processing other listeners.
             if ((firstMatchBit | allMatchesBit) != 0) {
@@ -332,7 +333,6 @@ class LBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
                 }
             }
             addressesSeen.add(address);
-            recentScanResults.put(address, result);
         }
 
         @Override

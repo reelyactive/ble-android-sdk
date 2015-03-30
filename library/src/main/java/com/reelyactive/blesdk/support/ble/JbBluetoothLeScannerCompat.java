@@ -28,7 +28,6 @@ import com.reelyactive.blesdk.support.ble.util.Clock;
 import com.reelyactive.blesdk.support.ble.util.Logger;
 import com.reelyactive.blesdk.support.ble.util.SystemClock;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -220,6 +219,7 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
      * This method will be called by the AIDL handler thread from onLeScan.
      */
     private synchronized void callbackLeScanClients(String address, ScanResult result) {
+        recentScanResults.put(address, result);
         for (ScanClient client : serialClients.values()) {
             if (matchesAnyFilter(client.filtersList, result)) {
                 boolean seenItBefore = client.addressesSeen.contains(address);
@@ -244,8 +244,6 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
                 }
             }
         }
-
-        recentScanResults.put(address, result);
     }
 
     @Override

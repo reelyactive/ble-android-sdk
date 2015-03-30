@@ -7,19 +7,15 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.os.Bundle;
-import android.os.Handler;
 import android.os.IBinder;
-import android.os.Message;
-import android.os.Messenger;
 import android.os.ParcelUuid;
-import android.os.RemoteException;
 import android.util.Log;
 
 import com.reelyactive.blesdk.service.BleService;
+import com.reelyactive.blesdk.service.BleServiceCallback;
 import com.reelyactive.blesdk.support.ble.ScanFilter;
 import com.reelyactive.blesdk.support.ble.ScanResult;
 
-import java.lang.ref.WeakReference;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import hugo.weaving.DebugLog;
@@ -36,15 +32,14 @@ import hugo.weaving.DebugLog;
  * @see android.app.Application.ActivityLifecycleCallbacks
  */
 @SuppressWarnings("unused")
-public class ReelyAwareApplicationCallback implements Application.ActivityLifecycleCallbacks {
+public abstract class ReelyAwareApplicationCallback implements Application.ActivityLifecycleCallbacks, BleServiceCallback {
     private static final String TAG = ReelyAwareApplicationCallback.class.getSimpleName();
     private final Context context;
     private final ServiceConnection serviceConnection;
     private boolean isBound = false;
     private final AtomicInteger activityCount = new AtomicInteger();
-    private Messenger toService;
-    private final Messenger fromService = new Messenger(new IncomingHahdler(this));
     private Activity current;
+    private BleService service;
 
     /**
      * As soon as the component is created, we bindBleService to the {@link BleService}
@@ -93,12 +88,7 @@ public class ReelyAwareApplicationCallback implements Application.ActivityLifecy
      * This method sends a scan request to the {@link BleService}.
      */
     protected void startScan() {
-        Message scanRequest = Message.obtain(null, BleService.Command.START_SCAN.ordinal());
-        try {
-            toService.send(scanRequest);
-        } catch (RemoteException e) {
-            Log.e(TAG, "Failed to send scanRequest to service.", e);
-        }
+        service.startScan();
     }
 
     /**
@@ -107,13 +97,7 @@ public class ReelyAwareApplicationCallback implements Application.ActivityLifecy
      * @param scanType The {@link BleService.ScanType scan type}
      */
     protected void updateScanType(BleService.ScanType scanType) {
-        Message scanRequest = Message.obtain(null, BleService.Command.SET_SCAN_TYPE.ordinal());
-        scanRequest.arg1 = scanType.ordinal();
-        try {
-            toService.send(scanRequest);
-        } catch (RemoteException e) {
-            Log.e(TAG, "Failed to update ScanType.", e);
-        }
+        service.setScanType(scanType);
     }
 
     /**
@@ -122,15 +106,7 @@ public class ReelyAwareApplicationCallback implements Application.ActivityLifecy
      * @param scanFilter The {@link ScanFilter scan filter}
      */
     protected void updateScanFilter(ScanFilter scanFilter) {
-        Message scanRequest = Message.obtain(null, BleService.Command.SET_SCAN_FILTER.ordinal());
-        Bundle data = new Bundle();
-        data.putParcelable(BleService.KEY_FILTER, scanFilter);
-        scanRequest.setData(data);
-        try {
-            toService.send(scanRequest);
-        } catch (RemoteException e) {
-            Log.e(TAG, "Failed to update ScanFilter.", e);
-        }
+        service.setScanFilter(scanFilter);
     }
 
     /**
@@ -167,7 +143,8 @@ public class ReelyAwareApplicationCallback implements Application.ActivityLifecy
      *
      * @param event The {@link BleService.Event} received from the {@link BleService}.
      */
-    protected void onBleEvent(BleService.Event event, Object data) {
+    @Override
+    public void onBleEvent(BleService.Event event, Object data) {
         switch (event) {
             case IN_REGION:
                 Log.d(TAG, "Application entered region");
@@ -218,6 +195,15 @@ public class ReelyAwareApplicationCallback implements Application.ActivityLifecy
     }
 
     /**
+     * Get access to the underlying service.
+     *
+     * @return The {@link com.reelyactive.blesdk.service.BleService} instance running.
+     */
+    protected BleService getService() {
+        return service;
+    }
+
+    /**
      * Find out if an {@link Activity} implements {@link ReelyAwareActivity}
      *
      * @param activity The {@link Activity}
@@ -250,13 +236,7 @@ public class ReelyAwareApplicationCallback implements Application.ActivityLifecy
 
     protected void unbindBleService() {
         if (isBound) {
-            Message registration = Message.obtain(null, BleService.Command.UNREGISTER_CLIENT.ordinal());
-            registration.replyTo = fromService;
-            try {
-                toService.send(registration);
-            } catch (RemoteException e) {
-                Log.e(TAG, "Failed to send unregistration to service.", e);
-            }
+            service.unregisterClient(this);
             context.unbindService(serviceConnection);
         }
     }
@@ -264,16 +244,10 @@ public class ReelyAwareApplicationCallback implements Application.ActivityLifecy
     final class BleServiceConnection implements ServiceConnection {
         @Override
         @DebugLog
-        public void onServiceConnected(ComponentName name, IBinder service) {
+        public void onServiceConnected(ComponentName name, IBinder remoteService) {
             isBound = true;
-            toService = new Messenger(service);
-            Message registration = Message.obtain(null, BleService.Command.REGISTER_CLIENT.ordinal());
-            registration.replyTo = fromService;
-            try {
-                toService.send(registration);
-            } catch (RemoteException e) {
-                Log.e(TAG, "Failed to send registration to service.", e);
-            }
+            service = ((BleService.LocalBinder) remoteService).getService();
+            service.registerClient(ReelyAwareApplicationCallback.this);
             onBleServiceBound();
         }
 
@@ -284,46 +258,4 @@ public class ReelyAwareApplicationCallback implements Application.ActivityLifecy
         }
     }
 
-    final static class IncomingHahdler extends Handler {
-        private WeakReference<ReelyAwareApplicationCallback> callback;
-
-        public IncomingHahdler(ReelyAwareApplicationCallback callback) {
-            this.callback = new WeakReference<ReelyAwareApplicationCallback>(callback);
-        }
-
-        @Override
-        public void handleMessage(Message msg) {
-            BleService.Event event = BleService.Event.fromOrdinal(msg.what);
-            ReelyAwareApplicationCallback applicationCallback = callback.get();
-            if (applicationCallback != null) {
-                applicationCallback.onBleEvent(event, (ScanResult) msg.getData().getParcelable(BleService.KEY_EVENT_DATA));
-            }
-        }
-    }
-
-
-    /**
-     * ************* METHODS NOT USED ******************
-     */
-
-    @Override
-    public void onActivityCreated(Activity activity, Bundle savedInstanceState) {
-    }
-
-    @Override
-    public void onActivityDestroyed(Activity activity) {
-    }
-
-    @Override
-    public void onActivityStarted(Activity activity) {
-    }
-
-
-    @Override
-    public void onActivityStopped(Activity activity) {
-    }
-
-    @Override
-    public void onActivitySaveInstanceState(Activity activity, Bundle outState) {
-    }
 }
