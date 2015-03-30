@@ -30,6 +30,7 @@ import com.reelyactive.blesdk.support.ble.util.Clock;
 import com.reelyactive.blesdk.support.ble.util.Logger;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -99,7 +100,7 @@ public abstract class BluetoothLeScannerCompat {
 
     /**
      * Starts a scan for Bluetooth LE devices, looking for device advertisements that match the
-     * given filters.  Attempts to start scans more than once with the same com.reelyactive.blesdk.support.ble.ScanCallback instance
+     * given filters.  Attempts to start scans more than once with the same {@link ScanCallback} instance
      * will fail and return {@code false}.
      * <p/>
      * Due to the resource limitations in BLE chipset, an app cannot add more than N(real number
@@ -114,7 +115,7 @@ public abstract class BluetoothLeScannerCompat {
      * advertising record is considered matching the filters if it matches any of the
      * BluetoothLeScanFilter in the list.
      * <p/>
-     * Results of the scan are reported using the onResult(List<com.reelyactive.blesdk.support.ble.ScanResult>) callback.
+     * Results of the scan are reported using the {@link ScanCallback#onScanResult(int, ScanResult)} callback.
      * <p/>
      * Requires BLUETOOTH_ADMIN permission.
      * <p/>
@@ -133,6 +134,23 @@ public abstract class BluetoothLeScannerCompat {
      * @param callback
      */
     public abstract void stopScan(ScanCallback callback);
+
+
+    /**
+     * Request matching records in the scanner's list.
+     *
+     * @param filters Filters which will apply
+     * @return The list of matching {@link ScanResult}
+     */
+    public List<ScanResult> getMatchingRecords(List<ScanFilter> filters) {
+        ArrayList<ScanResult> results = new ArrayList<ScanResult>();
+        for (Object res : getRecentScanResults().toArray()) {
+            if (matchesAnyFilter(filters, (ScanResult) res)) {
+                results.add((ScanResult) res);
+            }
+        }
+        return results;
+    }
 
     /**
      * Sets the Bluetooth LE scan cycle overriding values set on individual scans from
@@ -258,6 +276,20 @@ public abstract class BluetoothLeScannerCompat {
         }
     }
 
+
+    protected static boolean matchesAnyFilter(List<ScanFilter> filters, ScanResult result) {
+        if (filters == null || filters.isEmpty()) {
+            return true;
+        }
+        for (ScanFilter filter : filters) {
+            if (filter.matches(result)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+
     protected abstract Clock getClock();
 
     protected abstract int getMaxPriorityScanMode();
@@ -269,4 +301,7 @@ public abstract class BluetoothLeScannerCompat {
     protected abstract PendingIntent getAlarmIntent();
 
     protected abstract void onNewScanCycle();
+
+    protected abstract Collection<ScanResult> getRecentScanResults();
+
 }

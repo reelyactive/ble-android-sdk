@@ -28,6 +28,8 @@ import com.reelyactive.blesdk.support.ble.util.Clock;
 import com.reelyactive.blesdk.support.ble.util.Logger;
 import com.reelyactive.blesdk.support.ble.util.SystemClock;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -350,18 +352,6 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
         return maxPriority;
     }
 
-    private static boolean matchesAnyFilter(List<ScanFilter> filters, ScanResult result) {
-        if (filters == null || filters.isEmpty()) {
-            return true;
-        }
-        for (ScanFilter filter : filters) {
-            if (filter.matches(result)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     /**
      * Calculates the number of milliseconds since this device was booted up.
      * (Not a value that can be used as a real timestamp, but suitable for comparisons.)
@@ -388,5 +378,10 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
     @Override
     protected void onNewScanCycle() {
         blockingScanCycle();
+    }
+
+    @Override
+    protected Collection<ScanResult> getRecentScanResults() {
+        return recentScanResults.values();
     }
 }

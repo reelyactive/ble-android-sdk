@@ -30,10 +30,13 @@ import com.reelyactive.blesdk.support.ble.util.Logger;
 import com.reelyactive.blesdk.support.ble.util.SystemClock;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -51,6 +54,7 @@ class LBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
     private final Map<ScanCallback, ScanClient> callbacksMap =
             new HashMap<ScanCallback, ScanClient>();
     private final android.bluetooth.le.BluetoothLeScanner osScanner;
+    final HashMap<String, ScanResult> recentScanResults;
 
     /**
      * Package-protected constructor, used by {@link BluetoothLeScannerCompatProvider}.
@@ -67,6 +71,7 @@ class LBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
                               Clock clock, PendingIntent alarmIntent) {
         Logger.logDebug("BLE 'L' hardware access layer activated");
         this.osScanner = manager.getAdapter().getBluetoothLeScanner();
+        this.recentScanResults = new HashMap<String, ScanResult>();
         this.alarmManager = alarmManager;
         this.clock = clock;
         this.alarmIntent = alarmIntent;
@@ -110,6 +115,7 @@ class LBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
             updateRepeatingAlarm();
         }
     }
+
 
     @Override
     public Clock getClock() {
@@ -168,7 +174,7 @@ class LBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
                 .build();
     }
 
-    private static ScanClient toOs(final ScanCallback callback, ScanSettings settings) {
+    private ScanClient toOs(final ScanCallback callback, ScanSettings settings) {
         return new ScanClient(callback, settings);
     }
 
@@ -252,44 +258,60 @@ class LBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
         new Handler(Looper.getMainLooper()).post(new Runnable() {
             @Override
             public void run() {
-                Iterator<Map.Entry<ScanCallback, ScanClient>> iter = callbacksMap.entrySet().iterator();
+                Iterator<Map.Entry<String, ScanResult>> iter = recentScanResults.entrySet().iterator();
                 long lostTimestampMillis = getLostTimestampMillis();
+
+                // Clear out any expired notifications from the "old sightings" record.
                 while (iter.hasNext()) {
-                    Map.Entry<ScanCallback, ScanClient> entry = iter.next();
-                    ScanClient client = entry.getValue();
-                    Iterator<Map.Entry<String, ScanResult>> addresses = client.addressesSeen.entrySet().iterator();
-                    while (addresses.hasNext()) {
-                        Map.Entry<String, ScanResult> addrEntry = addresses.next();
-                        ScanResult savedResult = addrEntry.getValue();
-                        if (TimeUnit.NANOSECONDS.toMillis(savedResult.getTimestampNanos()) < lostTimestampMillis) {
-                            try {
-                                client.callback.onScanResult(ScanSettings.CALLBACK_TYPE_MATCH_LOST, savedResult);
-                            } catch (Exception e) {
-                                Logger.logError("Failure while sending 'lost' scan result to listener", e);
-                            }
-                            addresses.remove();
-                        }
+                    Map.Entry<String, ScanResult> entry = iter.next();
+                    String address = entry.getKey();
+                    ScanResult savedResult = entry.getValue();
+                    if (TimeUnit.NANOSECONDS.toMillis(savedResult.getTimestampNanos()) < lostTimestampMillis) {
+                        callbackLostLeScanClients(address, savedResult);
+                        iter.remove();
                     }
                 }
             }
         });
     }
 
-    private static class ScanClient extends android.bluetooth.le.ScanCallback {
-        final HashMap<String, ScanResult> addressesSeen;
+    @Override
+    protected Collection<ScanResult> getRecentScanResults() {
+        return recentScanResults.values();
+    }
+
+    private void callbackLostLeScanClients(String address, ScanResult result) {
+        for (ScanClient client : callbacksMap.values()) {
+            int wantAny = client.settings.getCallbackType() & ScanSettings.CALLBACK_TYPE_ALL_MATCHES;
+            int wantLost = client.settings.getCallbackType() & ScanSettings.CALLBACK_TYPE_MATCH_LOST;
+
+            if (client.addressesSeen.remove(address) && (wantAny | wantLost) != 0) {
+
+                // Catch any exceptions and log them but continue processing other scan results.
+                try {
+                    client.callback.onScanResult(ScanSettings.CALLBACK_TYPE_MATCH_LOST, result);
+                } catch (Exception e) {
+                    Logger.logError("Failure while sending 'lost' scan result to listener", e);
+                }
+            }
+        }
+    }
+
+    private class ScanClient extends android.bluetooth.le.ScanCallback {
+        final Set<String> addressesSeen;
         final ScanCallback callback;
         final ScanSettings settings;
 
         ScanClient(ScanCallback callback, ScanSettings settings) {
             this.settings = settings;
-            this.addressesSeen = new HashMap<String, ScanResult>();
+            this.addressesSeen = new HashSet<String>();
             this.callback = callback;
         }
 
         @Override
         public void onScanResult(int callbackType, android.bluetooth.le.ScanResult osResult) {
             String address = osResult.getDevice().getAddress();
-            boolean seenItBefore = addressesSeen.containsKey(address);
+            boolean seenItBefore = addressesSeen.contains(address);
             int clientFlags = settings.getCallbackType();
 
             int firstMatchBit = clientFlags & ScanSettings.CALLBACK_TYPE_FIRST_MATCH;
@@ -309,7 +331,8 @@ class LBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
                     Logger.logError("Failure while handling scan result", e);
                 }
             }
-            addressesSeen.put(address, result);
+            addressesSeen.add(address);
+            recentScanResults.put(address, result);
         }
 
         @Override
