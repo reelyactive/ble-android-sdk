@@ -199,7 +199,7 @@ public abstract class ReelyAwareApplicationCallback implements Application.Activ
      *
      * @return The {@link com.reelyactive.blesdk.service.BleService} instance running.
      */
-    protected BleService getService() {
+    protected BleService getBleService() {
         return service;
     }
 
