@@ -89,6 +89,8 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
     /* @VisibleForTesting */ final HashMap<ScanCallback, ScanClient> serialClients;
     private BluetoothCrashResolver crashResolver;
 
+    private Handler mainHandler;
+
     /**
      * The Bluetooth LE callback which will be registered with the OS,
      * to be fired on device discovery.
@@ -125,6 +127,7 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
                         new Intent(context, ScanWakefulBroadcastReceiver.class).putExtra(ScanWakefulService.EXTRA_USE_LOLLIPOP_API, false), 0 /* flags */));
         this.crashResolver = new BluetoothCrashResolver(context);
         this.crashResolver.start();
+        this.mainHandler = new Handler(Looper.getMainLooper());
     }
 
     /**
@@ -208,8 +211,13 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
      *
      * @VisibleForTesting
      */
-    void onScanResult(String address, ScanResult result) {
-        callbackLeScanClients(address, result);
+    void onScanResult(final String address, final ScanResult result) {
+        mainHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                callbackLeScanClients(address, result);
+            }
+        });
     }
 
     /**
