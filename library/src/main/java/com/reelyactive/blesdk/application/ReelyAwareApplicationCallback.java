@@ -6,7 +6,6 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
-import android.os.Bundle;
 import android.os.IBinder;
 import android.os.ParcelUuid;
 import android.util.Log;
@@ -62,9 +61,12 @@ public abstract class ReelyAwareApplicationCallback implements Application.Activ
     public void onActivityResumed(Activity activity) {
         Log.d(TAG, "activity resumed");
         current = activity;
-        if (isReelyAware(activity) && activityCount.incrementAndGet() == 1 && isBound) {
+        activityCount.incrementAndGet();
+        if (shouldStartScan()) {
             updateScanType(getScanType());
             startScan();
+        } else if (isBound) {
+            stopScan();
         }
     }
 
@@ -78,9 +80,12 @@ public abstract class ReelyAwareApplicationCallback implements Application.Activ
     public void onActivityPaused(Activity activity) {
         Log.d(TAG, "activity paused");
         current = null;
-        if (isReelyAware(activity) && activityCount.decrementAndGet() <= 0 && isBound) {
+        activityCount.decrementAndGet();
+        if (shouldStartScan()) {
             updateScanType(getScanType());
             startScan();
+        } else if (isBound) {
+            stopScan();
         }
     }
 
@@ -89,6 +94,13 @@ public abstract class ReelyAwareApplicationCallback implements Application.Activ
      */
     protected void startScan() {
         service.startScan();
+    }
+
+    /**
+     * This method requests the {@link BleService} to stop scanning.
+     */
+    protected void stopScan() {
+        service.stopScan();
     }
 
     /**
@@ -134,6 +146,10 @@ public abstract class ReelyAwareApplicationCallback implements Application.Activ
      */
     protected int getActivityCount() {
         return activityCount.get();
+    }
+
+    protected boolean shouldStartScan() {
+        return isReelyAware(current) && activityCount.get() == 1 && isBound;
     }
 
     /**
@@ -219,9 +235,11 @@ public abstract class ReelyAwareApplicationCallback implements Application.Activ
      */
     @DebugLog
     protected void onBleServiceBound() {
-        updateScanType(getScanType());
-        updateScanFilter(getScanFilter());
-        startScan();
+        if (shouldStartScan()) {
+            updateScanType(getScanType());
+            updateScanFilter(getScanFilter());
+            startScan();
+        }
     }
 
 
@@ -229,8 +247,9 @@ public abstract class ReelyAwareApplicationCallback implements Application.Activ
      * ************* PRIVATE STUFF ******************
      */
 
-    protected void bindBleService() {
-        context.bindService(new Intent(context, BleService.class), serviceConnection, Context.BIND_AUTO_CREATE);
+    @DebugLog
+    protected boolean bindBleService() {
+        return context.bindService(new Intent(context, BleService.class), serviceConnection, Context.BIND_AUTO_CREATE);
     }
 
 
@@ -243,7 +262,6 @@ public abstract class ReelyAwareApplicationCallback implements Application.Activ
 
     final class BleServiceConnection implements ServiceConnection {
         @Override
-        @DebugLog
         public void onServiceConnected(ComponentName name, IBinder remoteService) {
             isBound = true;
             service = ((BleService.LocalBinder) remoteService).getService();
@@ -252,7 +270,6 @@ public abstract class ReelyAwareApplicationCallback implements Application.Activ
         }
 
         @Override
-        @DebugLog
         public void onServiceDisconnected(ComponentName name) {
             isBound = false;
         }

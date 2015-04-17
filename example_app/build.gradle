@@ -1,7 +1,14 @@
-apply plugin: 'com.android.application'
-repositories {
-    mavenLocal()
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.jakewharton.hugo:hugo-plugin:1.2.1'
+    }
 }
+
+apply plugin: 'com.android.application'
+apply plugin: 'com.jakewharton.hugo'
 
 android {
     compileSdkVersion Integer.parseInt("" + project.properties.get('android.build_sdk_version'))

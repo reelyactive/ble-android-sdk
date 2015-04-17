@@ -131,6 +131,8 @@ public class BleService extends Service {
 
     @DebugLog
     public void stopScan() {
+        currentFilter = null;
+        currentSettings = null;
         scanner.stopScan(callback);
         notifyEvent(Event.SCAN_STOPPED);
     }

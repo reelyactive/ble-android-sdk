@@ -2,6 +2,8 @@
 <resources>
 
     <string name="app_name">BleScanner</string>
+    <string name="advanced">ReelyAdvancedScan</string>
+    <string name="simple">ReelySimpleScan</string>
     <string name="start_ble_scan">Start scan</string>
     <string name="stop_ble_scan">Stop scan</string>
 
