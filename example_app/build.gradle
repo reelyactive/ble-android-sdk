@@ -4,13 +4,13 @@ repositories {
 }
 
 android {
-    compileSdkVersion 21
-    buildToolsVersion "21.1.2"
+    compileSdkVersion Integer.parseInt("" + project.properties.get('android.build_sdk_version'))
+    buildToolsVersion project.properties.get('android.build_tools_version')
 
     defaultConfig {
         applicationId "com.reelyactive.blescanner"
-        minSdkVersion 21
-        targetSdkVersion 21
+        minSdkVersion project.properties.get('android.build_min_sdk_version')
+        targetSdkVersion project.properties.get('android.build_target_sdk_version')
         versionCode 1
         versionName "1.0"
     }
@@ -24,6 +24,6 @@ android {
 
 dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
-    compile 'com.android.support:appcompat-v7:21.0.3'
+    compile 'com.android.support:appcompat-v7:22.0.0'
     compile project(':blesdk')
 }

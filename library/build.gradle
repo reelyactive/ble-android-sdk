@@ -6,7 +6,7 @@ apply plugin: 'com.jakewharton.hugo'
 group = properties['project.group']
 version = properties['project.version']
 project.archivesBaseName = properties['project.artifactId']
-def isRelease = !((String)project.properties.get('project.version')).contains("SNAPSHOT")
+def isRelease = !((String) project.properties.get('project.version')).contains("SNAPSHOT")
 def isSnapshot = !isRelease
 
 buildscript {
@@ -19,12 +19,12 @@ buildscript {
 }
 
 android {
-    compileSdkVersion Integer.parseInt(ANDROID_BUILD_SDK_VERSION)
-    buildToolsVersion ANDROID_BUILD_SDK_VERSION
+    compileSdkVersion Integer.parseInt("" + project.properties.get('android.build_sdk_version'))
+    buildToolsVersion project.properties.get('android.build_tools_version')
 
     defaultConfig {
-        minSdkVersion ANDROID_BUILD_MIN_SDK_VERSION
-        targetSdkVersion ANDROID_BUILD_TARGET_SDK_VERSION
+        minSdkVersion project.properties.get('android.build_min_sdk_version')
+        targetSdkVersion project.properties.get('android.build_target_sdk_version')
     }
     buildTypes {
         release {
@@ -103,7 +103,7 @@ install {
 }
 
 dependencies {
-    compile 'com.android.support:support-v4:21.0.3'
+    compile 'com.android.support:support-v4:22.0.0'
 }
 
 task sourcesJar(type: Jar) {

@@ -107,7 +107,7 @@ public class DummyBleAdvertiser implements BleAdvertiser {
         OutputStream os = null;
         BufferedReader is = null;
         try {
-            url = new URL("http://www.hyperlocalcontext.com/event/");
+            url = new URL("http://www.hyperlocalcontext.com/event");
             URLConnection conn = url.openConnection();
             conn.setDoInput(true);
             conn.setDoOutput(true);
