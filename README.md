@@ -30,23 +30,15 @@ And make sure any activity which needs to get notified about bluetooth event imp
 public class ReelyAwareScanActivity extends Activity implements ReelyAwareActivity {
 
     @Override
-    public void onScanStarted() {
-
-    }
+    public void onScanStarted() {}
 
     @Override
-    public void onScanStopped() {
-
-    }
+    public void onScanStopped() {}
 
     @Override
-    public void onEnterRegion(ScanResult beacon) {
-        adapter.addItem(beacon);
-    }
+    public void onEnterRegion(ScanResult beacon) {}
 
     @Override
-    public void onLeaveRegion(ScanResult beacon) {
-        adapter.removeItem(beacon);
-    }
+    public void onLeaveRegion(ScanResult beacon) {}
 }
 ```
