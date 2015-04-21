@@ -38,7 +38,7 @@ public class BleScanFragment extends Fragment {
     public void onAttach(Activity activity) {
         super.onAttach(activity);
         mContext = activity.getApplicationContext();
-        scanner = BluetoothLeScannerCompatProvider.getBluetoothLeScannerCompat(mContext, false);
+        scanner = BluetoothLeScannerCompatProvider.getBluetoothLeScannerCompat(mContext);
         isScanning = false;
         scanCallback = new ScanCallback() {
             @Override

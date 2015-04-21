@@ -35,7 +35,7 @@ public abstract class ReelyAwareApplicationCallback implements Application.Activ
     private static final String TAG = ReelyAwareApplicationCallback.class.getSimpleName();
     private final Context context;
     private final ServiceConnection serviceConnection;
-    private boolean isBound = false;
+    private boolean bound = false;
     private final AtomicInteger activityCount = new AtomicInteger();
     private Activity current;
     private BleService service;
@@ -65,7 +65,7 @@ public abstract class ReelyAwareApplicationCallback implements Application.Activ
         if (shouldStartScan()) {
             updateScanType(getScanType());
             startScan();
-        } else if (isBound) {
+        } else if (isBound()) {
             stopScan();
         }
     }
@@ -84,7 +84,7 @@ public abstract class ReelyAwareApplicationCallback implements Application.Activ
         if (shouldStartScan()) {
             updateScanType(getScanType());
             startScan();
-        } else if (isBound) {
+        } else if (isBound()) {
             stopScan();
         }
     }
@@ -93,14 +93,14 @@ public abstract class ReelyAwareApplicationCallback implements Application.Activ
      * This method sends a scan request to the {@link BleService}.
      */
     protected void startScan() {
-        service.startScan();
+        getBleService().startScan();
     }
 
     /**
      * This method requests the {@link BleService} to stop scanning.
      */
     protected void stopScan() {
-        service.stopScan();
+        getBleService().stopScan();
     }
 
     /**
@@ -109,7 +109,7 @@ public abstract class ReelyAwareApplicationCallback implements Application.Activ
      * @param scanType The {@link BleService.ScanType scan type}
      */
     protected void updateScanType(BleService.ScanType scanType) {
-        service.setScanType(scanType);
+        getBleService().setScanType(scanType);
     }
 
     /**
@@ -118,7 +118,7 @@ public abstract class ReelyAwareApplicationCallback implements Application.Activ
      * @param scanFilter The {@link ScanFilter scan filter}
      */
     protected void updateScanFilter(ScanFilter scanFilter) {
-        service.setScanFilter(scanFilter);
+        getBleService().setScanFilter(scanFilter);
     }
 
     /**
@@ -136,20 +136,17 @@ public abstract class ReelyAwareApplicationCallback implements Application.Activ
      * @return The {@link BleService.ScanType} to be used in the current application state.
      */
     protected BleService.ScanType getScanType() {
-        return activityCount.get() == 0 ? BleService.ScanType.LOW_POWER : BleService.ScanType.ACTIVE;
+        return getActivityCount() == 0 ? BleService.ScanType.LOW_POWER : BleService.ScanType.ACTIVE;
     }
 
     /**
-     * Get the number of {@link ReelyAwareActivity ReelyAwareActivities} currently running (0 or 1 basically)
+     * Called by the class in order to check if a scan should be started.<br>
+     * Override this method if you need to change the behaviour of the scan.
      *
-     * @return The number of {@link ReelyAwareActivity ReelyAwareActivities} running
+     * @return true if the conditions for a scan are present, false otherwise.
      */
-    protected int getActivityCount() {
-        return activityCount.get();
-    }
-
     protected boolean shouldStartScan() {
-        return isReelyAware(current) && activityCount.get() == 1 && isBound;
+        return isReelyAware(getCurrentActivity()) && getActivityCount() == 1 && isBound();
     }
 
     /**
@@ -158,38 +155,42 @@ public abstract class ReelyAwareApplicationCallback implements Application.Activ
      * Override this and you can customize the behaviour of the application.
      *
      * @param event The {@link BleService.Event} received from the {@link BleService}.
+     * @return true if the event was processed, false otherwise;
      */
     @Override
-    public void onBleEvent(BleService.Event event, Object data) {
+    public boolean onBleEvent(BleService.Event event, Object data) {
+        boolean processed = isReelyAware(getCurrentActivity());
         switch (event) {
             case IN_REGION:
                 Log.d(TAG, "Application entered region");
-                if (isReelyAware(getCurrentActivity())) {
+                if (processed) {
                     ((ReelyAwareActivity) getCurrentActivity()).onEnterRegion((ScanResult) data);
                 }
                 break;
             case OUT_REGION:
                 Log.d(TAG, "Application left region");
-                if (isReelyAware(getCurrentActivity())) {
+                if (processed) {
                     ((ReelyAwareActivity) getCurrentActivity()).onLeaveRegion((ScanResult) data);
                 }
                 break;
             case SCAN_STARTED:
                 Log.d(TAG, "Scan started");
-                if (isReelyAware(getCurrentActivity())) {
+                if (processed) {
                     ((ReelyAwareActivity) getCurrentActivity()).onScanStarted();
                 }
                 break;
             case SCAN_STOPPED:
                 Log.d(TAG, "Scan stopped");
-                if (isReelyAware(getCurrentActivity())) {
+                if (processed) {
                     ((ReelyAwareActivity) getCurrentActivity()).onScanStopped();
                 }
                 break;
             default:
+                processed = false;
                 Log.d(TAG, "Unhandled BLE Event : " + event);
                 break;
         }
+        return processed;
     }
 
     /**
@@ -220,6 +221,24 @@ public abstract class ReelyAwareApplicationCallback implements Application.Activ
     }
 
     /**
+     * Get the number of {@link ReelyAwareActivity ReelyAwareActivities} currently running (0 or 1 basically)
+     *
+     * @return The number of {@link ReelyAwareActivity ReelyAwareActivities} running
+     */
+    protected int getActivityCount() {
+        return activityCount.get();
+    }
+
+    /**
+     * Get the status of the connection to the {@link BleService}
+     *
+     * @return true if the {@link BleService} is bound, false otherwise.
+     */
+    protected boolean isBound() {
+        return bound;
+    }
+
+    /**
      * Find out if an {@link Activity} implements {@link ReelyAwareActivity}
      *
      * @param activity The {@link Activity}
@@ -227,6 +246,23 @@ public abstract class ReelyAwareApplicationCallback implements Application.Activ
      */
     protected static boolean isReelyAware(Activity activity) {
         return activity != null && ReelyAwareActivity.class.isInstance(activity);
+    }
+
+    /**
+     * ************* PRIVATE STUFF ******************
+     */
+
+    @DebugLog
+    protected boolean bindBleService() {
+        return context.bindService(new Intent(context, BleService.class), serviceConnection, Context.BIND_AUTO_CREATE);
+    }
+
+
+    protected void unbindBleService() {
+        if (isBound()) {
+            service.unregisterClient(this);
+            context.unbindService(serviceConnection);
+        }
     }
 
     /**
@@ -242,28 +278,10 @@ public abstract class ReelyAwareApplicationCallback implements Application.Activ
         }
     }
 
-
-    /**
-     * ************* PRIVATE STUFF ******************
-     */
-
-    @DebugLog
-    protected boolean bindBleService() {
-        return context.bindService(new Intent(context, BleService.class), serviceConnection, Context.BIND_AUTO_CREATE);
-    }
-
-
-    protected void unbindBleService() {
-        if (isBound) {
-            service.unregisterClient(this);
-            context.unbindService(serviceConnection);
-        }
-    }
-
     final class BleServiceConnection implements ServiceConnection {
         @Override
         public void onServiceConnected(ComponentName name, IBinder remoteService) {
-            isBound = true;
+            bound = true;
             service = ((BleService.LocalBinder) remoteService).getService();
             service.registerClient(ReelyAwareApplicationCallback.this);
             onBleServiceBound();
@@ -271,7 +289,7 @@ public abstract class ReelyAwareApplicationCallback implements Application.Activ
 
         @Override
         public void onServiceDisconnected(ComponentName name) {
-            isBound = false;
+            bound = false;
         }
     }
 
