@@ -146,7 +146,7 @@ public abstract class ReelyAwareApplicationCallback implements Application.Activ
      * @return true if the conditions for a scan are present, false otherwise.
      */
     protected boolean shouldStartScan() {
-        return isReelyAware(getCurrentActivity()) && getActivityCount() == 1 && isBound();
+        return isReelyAware(getCurrentActivity()) && isBound();
     }
 
     /**

@@ -87,7 +87,6 @@ public class BleScanFragment extends Fragment {
                         scanner.startScan(
                                 Arrays.asList(new ScanFilter.Builder().setServiceUuid(ParcelUuid.fromString("7265656c-7941-6374-6976-652055554944")).build()),
                                 new ScanSettings.Builder() //
-                                        //.setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
                                         .setCallbackType(ScanSettings.CALLBACK_TYPE_FIRST_MATCH | ScanSettings.CALLBACK_TYPE_MATCH_LOST) //
                                         .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY) //
                                         .setScanResultType(ScanSettings.SCAN_RESULT_TYPE_FULL) //

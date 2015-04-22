@@ -18,7 +18,7 @@ import hugo.weaving.DebugLog;
  * Created by saiimons on 15-03-09.
  */
 @TargetApi(Build.VERSION_CODES.LOLLIPOP)
-public class LBleAdvertiser implements BleAdvertiser {
+public class LBleAdvertiser extends BleAdvertiser {
     private final BluetoothLeAdvertiser advertiser;
     private final Context context;
     private final AdvertiseCallback callback = new AdvertiseCallback() {
@@ -42,7 +42,7 @@ public class LBleAdvertiser implements BleAdvertiser {
 
     @Override
     @DebugLog
-    public void startAdvertising(String uuid, ScanResult closestBeaconId) {
+    public void startAdvertising(String uuid, ScanResult closestBeaconId, String fallbackUrl) {
         stopAdvertising();
         advertiser.startAdvertising(
                 new AdvertiseSettings.Builder().setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_BALANCED).build(),

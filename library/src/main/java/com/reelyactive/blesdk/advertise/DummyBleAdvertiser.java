@@ -27,7 +27,7 @@ import java.util.TimeZone;
 /**
  * Created by saiimons on 15-03-09.
  */
-public class DummyBleAdvertiser implements BleAdvertiser {
+public class DummyBleAdvertiser extends BleAdvertiser {
     private final Context context;
     private String uuid;
     private ScanResult closestBeacon;
@@ -37,6 +37,7 @@ public class DummyBleAdvertiser implements BleAdvertiser {
     private boolean advertising = false;
 
     private final AdvertisingRunnable runnable;
+    private String url;
 
     public DummyBleAdvertiser(Context context) {
         this.context = context;
@@ -82,16 +83,18 @@ public class DummyBleAdvertiser implements BleAdvertiser {
     }
 
     @Override
-    public void startAdvertising(String uuid, ScanResult closestBeacon) {
+    public void startAdvertising(String uuid, ScanResult closestBeacon, String fallbackUrl) {
         if (Looper.myLooper() != Looper.getMainLooper()) {
             throw new RuntimeException("Do not try to run from outside the main thread !");
         }
         this.uuid = uuid;
         this.closestBeacon = closestBeacon;
+        this.url = fallbackUrl;
         if (!advertising) {
             advertising = true;
             worker.getHandler().post(runnable);
         }
+
     }
 
     @Override
@@ -103,11 +106,15 @@ public class DummyBleAdvertiser implements BleAdvertiser {
     }
 
     private void advertise() {
+        if (url == null || closestBeacon == null) {
+            advertising = false;
+            return;
+        }
         URL url;
         OutputStream os = null;
         BufferedReader is = null;
         try {
-            url = new URL("http://www.hyperlocalcontext.com/event");
+            url = new URL(this.url);
             URLConnection conn = url.openConnection();
             conn.setDoInput(true);
             conn.setDoOutput(true);
