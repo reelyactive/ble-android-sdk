@@ -1,0 +1,4 @@
+com.reelyactive.blesdk.application
+com.reelyactive.blesdk.service
+com.reelyactive.blesdk.support.ble
+com.reelyactive.blesdk.support.ble.util
