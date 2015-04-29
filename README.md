@@ -3,6 +3,8 @@ This SDK allows you to scan beacons and advertise as a beacon.
 
 The SDK is compatible with all versions of Android supporting BLE (ie. 4.3+).
 
+Have a look at the [javadoc](http://reelyactive.github.io/ble-android-sdk) !
+
 ## Gradle
 
 
@@ -123,3 +125,36 @@ When you are done, stop the scan :
 ```java
 scanner.stopScan(scanCallback);
 ```
+
+## Advertising
+We desgined the advertising, so that it will be compatible with [hlc-server](https://github.com/reelyactive/).
+
+You can get a reference to a [BleAdvertiser](library/src/main/java/com/reelyactive/blesdk/advertise/BleAdvertiser.java) with the following code:
+```java
+BleAdvertiser avertiser = BleAdvertiserProvider.getAdvertiser(context);
+
+```
+
+Once you got it, you can advertise:
+```java
+advertiser.startAdvertising(uuid);
+```
+Though, if you are using devices on which this feature is not available, it is advised to use:
+```java
+advertiser.startAdvertising(uuid, closestBeacon);
+```
+This will make sure that any device can report data to HLC.<br/>
+Give it a scan result which matches the closest beacon, for example using :
+```java
+List<ScanResult> results = myAppCallback.getBleService().getMatchingRecentResults(myAppCallback.getScanFilter());
+```
+
+If you run your own HLC server, you might want to use:
+```java
+advertiser.startAdvertising(uuid, closestBeacon, myHlcServerUrl);
+```
+# Other information
+This project uses the Apache Licence, and embeds code from [Google](https://github.com/google/uribeacon/tree/master/android-uribeacon/uribeacon-library/src/main/java/org/uribeacon/scan/compat)'s UriBeacon project.
+
+# Other great projects from ReelyActive
+Have a look [there](https://github.com/reelyactive) !
