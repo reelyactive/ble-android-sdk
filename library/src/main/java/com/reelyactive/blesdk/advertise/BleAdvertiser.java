@@ -15,6 +15,6 @@ public abstract class BleAdvertiser {
     }
 
     public void startAdvertising(String uuid, ScanResult closestBeacon) {
-        startAdvertising(uuid, closestBeacon, "http://www.hyperlocalcontext.com/event");
+        startAdvertising(uuid, closestBeacon, "http://www.hyperlocalcontext.com/events");
     }
 }

@@ -162,7 +162,12 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
         Logger.logDebug("Starting BLE Active Scan Cycle.");
         int activeMillis = getScanActiveMillis();
         if (activeMillis > 0) {
-            bluetoothAdapter.startLeScan(leScanCallback);
+            try {
+                bluetoothAdapter.startLeScan(leScanCallback);
+            } catch (IllegalStateException e) {
+                Logger.logError("Failed to start the scan", e);
+            }
+
             // Sleep for the duration of the scan. No wakeups are expected, but catch is required.
             try {
                 wait(activeMillis);
@@ -174,6 +179,8 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
                 } catch (NullPointerException e) {
                     // An NPE is thrown if Bluetooth has been reset since this blocking scan began.
                     Logger.logDebug("NPE thrown in BlockingScanCycle");
+                } catch (IllegalStateException e) {
+                    Logger.logError("Failed to stop the scan", e);
                 }
                 // Active BLE scan ends
                 // Execute cycle complete to 1) detect lost devices
