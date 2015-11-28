@@ -24,6 +24,7 @@ import android.content.Intent;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.TextUtils;
 
 import com.reelyactive.blesdk.support.ble.util.Clock;
 import com.reelyactive.blesdk.support.ble.util.Logger;
@@ -46,15 +47,10 @@ import java.util.concurrent.TimeUnit;
 @TargetApi(Build.VERSION_CODES.LOLLIPOP)
 class LBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
 
-    // Alarm Scan variables
-    private final Clock clock;
-    private final AlarmManager alarmManager;
-    private final PendingIntent alarmIntent;
-
-    private final Map<ScanCallback, ScanClient> callbacksMap =
-            new HashMap<ScanCallback, ScanClient>();
-    private final android.bluetooth.le.BluetoothLeScanner osScanner;
     final HashMap<String, ScanResult> recentScanResults;
+    // Alarm Scan variables
+    private final Map<ScanCallback, ScanClient> callbacksMap = new HashMap<ScanCallback, ScanClient>();
+    private final android.bluetooth.le.BluetoothLeScanner osScanner;
 
     /**
      * Package-protected constructor, used by {@link BluetoothLeScannerCompatProvider}.
@@ -62,120 +58,32 @@ class LBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
      * Cannot be called from emulated devices that don't implement a BluetoothAdapter.
      */
     LBluetoothLeScannerCompat(Context context, BluetoothManager manager, AlarmManager alarmManager) {
-        this(manager, alarmManager, new SystemClock(),
-                PendingIntent.getBroadcast(context, 0 /* requestCode */,
-                        new Intent(context, ScanWakefulBroadcastReceiver.class).putExtra(ScanWakefulService.EXTRA_USE_LOLLIPOP_API, true), 0 /* flags */));
+        this(
+                manager,
+                alarmManager,
+                new SystemClock(),
+                PendingIntent.getBroadcast(
+                        context,
+                        0 /* requestCode */,
+                        new Intent(context, ScanWakefulBroadcastReceiver.class).putExtra(ScanWakefulService.EXTRA_USE_LOLLIPOP_API, true),
+                        0 /* flags */
+                )
+        );
     }
 
     LBluetoothLeScannerCompat(BluetoothManager manager, AlarmManager alarmManager,
                               Clock clock, PendingIntent alarmIntent) {
+        super(clock, alarmManager, alarmIntent);
         Logger.logDebug("BLE 'L' hardware access layer activated");
         this.osScanner = manager.getAdapter().getBluetoothLeScanner();
         this.recentScanResults = new HashMap<String, ScanResult>();
-        this.alarmManager = alarmManager;
-        this.clock = clock;
-        this.alarmIntent = alarmIntent;
     }
-
-    @Override
-    public boolean startScan(List<ScanFilter> filters, ScanSettings settings, ScanCallback callback) {
-        if (callbacksMap.containsKey(callback)) {
-            Logger.logInfo("StartScan(): BLE 'L' hardware scan already in progress...");
-            stopScan(callback);
-        }
-
-        android.bluetooth.le.ScanSettings osSettings = toOs(settings);
-        ScanClient osCallback = toOs(callback, settings);
-        List<android.bluetooth.le.ScanFilter> osFilters = toOs(filters);
-
-        callbacksMap.put(callback, osCallback);
-        try {
-            Logger.logInfo("Starting BLE 'L' hardware scan");
-            osScanner.startScan(osFilters, osSettings, osCallback);
-            updateRepeatingAlarm();
-            return true;
-        } catch (Exception e) {
-            Logger.logError("Exception caught calling 'L' BluetoothLeScanner.startScan()", e);
-            return false;
-        }
-    }
-
-    @Override
-    public void stopScan(ScanCallback callback) {
-        android.bluetooth.le.ScanCallback osCallback = callbacksMap.get(callback);
-
-        if (osCallback != null) {
-            try {
-                Logger.logInfo("Stopping BLE 'L' hardware scan");
-                osScanner.stopScan(osCallback);
-            } catch (Exception e) {
-                Logger.logError("Exception caught calling 'L' BluetoothLeScanner.stopScan()", e);
-            }
-            callbacksMap.remove(callback);
-            updateRepeatingAlarm();
-        }
-    }
-
-
-    @Override
-    public Clock getClock() {
-        return clock;
-    }
-
-    private int getScanModePriority(int mode) {
-        switch (mode) {
-            case ScanSettings.SCAN_MODE_LOW_LATENCY:
-                return 2;
-            case ScanSettings.SCAN_MODE_BALANCED:
-                return 1;
-            case ScanSettings.SCAN_MODE_LOW_POWER:
-                return 0;
-            default:
-                Logger.logError("Unknown scan mode " + mode);
-                return 0;
-        }
-    }
-
-    protected int getMaxPriorityScanMode() {
-        int maxPriority = -1;
-
-        for (ScanClient scanClient : callbacksMap.values()) {
-            ScanSettings settings = scanClient.settings;
-            if (maxPriority == -1
-                    || getScanModePriority(settings.getScanMode()) > getScanModePriority(maxPriority)) {
-                maxPriority = settings.getScanMode();
-            }
-        }
-        return maxPriority;
-    }
-
-    @Override
-    protected boolean hasClients() {
-        return !callbacksMap.isEmpty();
-    }
-
-    @Override
-    protected AlarmManager getAlarmManager() {
-        return alarmManager;
-    }
-
-    @Override
-    protected PendingIntent getAlarmIntent() {
-        return alarmIntent;
-    }
-
-    /////////////////////////////////////////////////////////////////////////////
-    // Conversion methods
 
     private static android.bluetooth.le.ScanSettings toOs(ScanSettings settings) {
         return new android.bluetooth.le.ScanSettings.Builder()
                 .setReportDelay(settings.getReportDelayMillis())
                 .setScanMode(settings.getScanMode())
                 .build();
-    }
-
-    private ScanClient toOs(final ScanCallback callback, ScanSettings settings) {
-        return new ScanClient(callback, settings);
     }
 
     private static List<android.bluetooth.le.ScanFilter> toOs(List<ScanFilter> filters) {
@@ -189,10 +97,10 @@ class LBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
 
     private static android.bluetooth.le.ScanFilter toOs(ScanFilter filter) {
         android.bluetooth.le.ScanFilter.Builder builder = new android.bluetooth.le.ScanFilter.Builder();
-        if (!isNullOrEmpty(filter.getDeviceAddress())) {
+        if (!TextUtils.isEmpty(filter.getDeviceAddress())) {
             builder.setDeviceAddress(filter.getDeviceAddress());
         }
-        if (!isNullOrEmpty(filter.getDeviceName())) {
+        if (!TextUtils.isEmpty(filter.getDeviceName())) {
             builder.setDeviceName(filter.getDeviceName());
         }
         if (filter.getManufacturerId() != -1 && filter.getManufacturerData() != null) {
@@ -248,31 +156,117 @@ class LBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
         return ScanRecord.parseFromBytes(osRecord.getBytes());
     }
 
-    private static boolean isNullOrEmpty(String s) {
-        return (s == null) || s.isEmpty();
+    /////////////////////////////////////////////////////////////////////////////
+    // Conversion methods
+
+    @Override
+    public boolean startScan(List<ScanFilter> filters, ScanSettings settings, ScanCallback callback) {
+        if (callbacksMap.containsKey(callback)) {
+            Logger.logInfo("StartScan(): BLE 'L' hardware scan already in progress...");
+            stopScan(callback);
+        }
+
+        android.bluetooth.le.ScanSettings osSettings = toOs(settings);
+        ScanClient osCallback = toOs(callback, settings);
+        List<android.bluetooth.le.ScanFilter> osFilters = toOs(filters);
+
+        callbacksMap.put(callback, osCallback);
+        try {
+            Logger.logInfo("Starting BLE 'L' hardware scan ");
+            for (ScanFilter filter : filters) {
+                Logger.logInfo("\tFilter " + filter);
+            }
+            osScanner.startScan(osFilters, osSettings, osCallback);
+            updateRepeatingAlarm();
+            return true;
+        } catch (Exception e) {
+            Logger.logError("Exception caught calling 'L' BluetoothLeScanner.startScan()", e);
+            return false;
+        }
+    }
+
+    @Override
+    public void stopScan(ScanCallback callback) {
+        android.bluetooth.le.ScanCallback osCallback = callbacksMap.get(callback);
+
+        if (osCallback != null) {
+            try {
+                Logger.logInfo("Stopping BLE 'L' hardware scan");
+                osScanner.stopScan(osCallback);
+            } catch (Exception e) {
+                Logger.logError("Exception caught calling 'L' BluetoothLeScanner.stopScan()", e);
+            }
+            callbacksMap.remove(callback);
+            updateRepeatingAlarm();
+        }
+    }
+
+    private int getScanModePriority(int mode) {
+        switch (mode) {
+            case ScanSettings.SCAN_MODE_LOW_LATENCY:
+            case ScanSettings.SCAN_MODE_BALANCED:
+            case ScanSettings.SCAN_MODE_LOW_POWER:
+                return mode;
+            default:
+                Logger.logError("Unknown scan mode " + mode);
+                return 0;
+        }
+    }
+
+    protected int getMaxPriorityScanMode() {
+        int maxPriority = -1;
+
+        for (ScanClient scanClient : callbacksMap.values()) {
+            ScanSettings settings = scanClient.settings;
+            if (maxPriority == -1
+                    || getScanModePriority(settings.getScanMode()) > getScanModePriority(maxPriority)) {
+                maxPriority = settings.getScanMode();
+            }
+        }
+        return maxPriority;
+    }
+
+    @Override
+    protected boolean hasClients() {
+        return !callbacksMap.isEmpty();
+    }
+
+    private ScanClient toOs(final ScanCallback callback, ScanSettings settings) {
+        return new ScanClient(callback, settings);
     }
 
     @Override
     protected void onNewScanCycle() {
-
-        new Handler(Looper.getMainLooper()).post(new Runnable() {
-            @Override
-            public void run() {
-                Iterator<Map.Entry<String, ScanResult>> iter = recentScanResults.entrySet().iterator();
-                long lostTimestampMillis = getLostTimestampMillis();
-
-                // Clear out any expired notifications from the "old sightings" record.
-                while (iter.hasNext()) {
-                    Map.Entry<String, ScanResult> entry = iter.next();
-                    String address = entry.getKey();
-                    ScanResult savedResult = entry.getValue();
-                    if (TimeUnit.NANOSECONDS.toMillis(savedResult.getTimestampNanos()) < lostTimestampMillis) {
-                        callbackLostLeScanClients(address, savedResult);
-                        iter.remove();
-                    }
+        int activeMillis = getScanActiveMillis();
+        if (activeMillis > 0) {
+            synchronized (this) {
+                try {
+                    wait(activeMillis);
+                } catch (InterruptedException e) {
+                    Logger.logError("Exception in ScanCycle Sleep", e);
                 }
             }
-        });
+        }
+        HashMap<String, ScanResult> results = (HashMap<String, ScanResult>) recentScanResults.clone();
+        Iterator<Map.Entry<String, ScanResult>> iter = results.entrySet().iterator();
+        long lostTimestampMillis = getLostTimestampMillis();
+
+        // Clear out any expired notifications from the "old sightings" record.
+        while (iter.hasNext()) {
+            Map.Entry<String, ScanResult> entry = iter.next();
+            final String address = entry.getKey();
+            final ScanResult savedResult = entry.getValue();
+            if (TimeUnit.NANOSECONDS.toMillis(savedResult.getTimestampNanos()) < lostTimestampMillis) {
+                new Handler(Looper.getMainLooper()).post(new Runnable() {
+                    @Override
+                    public void run() {
+                        callbackLostLeScanClients(address, savedResult);
+                    }
+                });
+                iter.remove();
+            }
+        }
+        updateRepeatingAlarm();
     }
 
     @Override

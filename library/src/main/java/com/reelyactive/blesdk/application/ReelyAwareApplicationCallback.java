@@ -1,11 +1,14 @@
 package com.reelyactive.blesdk.application;
 
+import android.Manifest;
 import android.app.Activity;
 import android.app.Application;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.IBinder;
 import android.os.ParcelUuid;
 import android.util.Log;
@@ -14,6 +17,7 @@ import com.reelyactive.blesdk.service.BleService;
 import com.reelyactive.blesdk.service.BleServiceCallback;
 import com.reelyactive.blesdk.support.ble.ScanFilter;
 import com.reelyactive.blesdk.support.ble.ScanResult;
+import com.reelyactive.blesdk.support.ble.util.Logger;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -35,8 +39,8 @@ public abstract class ReelyAwareApplicationCallback implements Application.Activ
     private static final String TAG = ReelyAwareApplicationCallback.class.getSimpleName();
     private final Context context;
     private final ServiceConnection serviceConnection;
-    private boolean bound = false;
     private final AtomicInteger activityCount = new AtomicInteger();
+    private boolean bound = false;
     private Activity current;
     private BleService service;
 
@@ -52,6 +56,16 @@ public abstract class ReelyAwareApplicationCallback implements Application.Activ
     }
 
     /**
+     * Find out if an {@link Activity} implements {@link ReelyAwareActivity}
+     *
+     * @param activity The {@link Activity}
+     * @return true if the {@link Activity} implements {@link ReelyAwareActivity}, false if not.
+     */
+    protected static boolean isReelyAware(Activity activity) {
+        return activity != null && ReelyAwareActivity.class.isInstance(activity);
+    }
+
+    /**
      * The default behaviour is to check if a {@link ReelyAwareActivity} is running, and call a scan if so.<br/>
      * See {@link #startScan()} and {@link #getScanType()}
      *
@@ -62,10 +76,7 @@ public abstract class ReelyAwareApplicationCallback implements Application.Activ
         Log.d(TAG, "activity resumed");
         current = activity;
         activityCount.incrementAndGet();
-        if (shouldStartScan()) {
-            updateScanType(getScanType());
-            startScan();
-        } else if (isBound()) {
+        if (!startScan()) {
             stopScan();
         }
     }
@@ -81,26 +92,33 @@ public abstract class ReelyAwareApplicationCallback implements Application.Activ
         Log.d(TAG, "activity paused");
         current = null;
         activityCount.decrementAndGet();
-        if (shouldStartScan()) {
-            updateScanType(getScanType());
-            startScan();
-        } else if (isBound()) {
+        if (!startScan()) {
             stopScan();
         }
     }
 
     /**
      * This method sends a scan request to the {@link BleService}.
+     *
+     * @return True if the service has started, false otherwise.
      */
-    protected void startScan() {
-        getBleService().startScan();
+    protected boolean startScan() {
+        if (isBound() && hasScanPermissions() && shouldStartScan()) {
+            updateScanType(getScanType());
+            updateScanFilter(getScanFilter());
+            getBleService().startScan();
+            return true;
+        }
+        return false;
     }
 
     /**
      * This method requests the {@link BleService} to stop scanning.
      */
     protected void stopScan() {
-        getBleService().stopScan();
+        if (isBound()) {
+            getBleService().stopScan();
+        }
     }
 
     /**
@@ -109,6 +127,7 @@ public abstract class ReelyAwareApplicationCallback implements Application.Activ
      * @param scanType The {@link BleService.ScanType scan type}
      */
     protected void updateScanType(BleService.ScanType scanType) {
+        Logger.logInfo("Updating scan type to " + scanType);
         getBleService().setScanType(scanType);
     }
 
@@ -146,7 +165,19 @@ public abstract class ReelyAwareApplicationCallback implements Application.Activ
      * @return true if the conditions for a scan are present, false otherwise.
      */
     protected boolean shouldStartScan() {
-        return isReelyAware(getCurrentActivity()) && isBound();
+        return isReelyAware(getCurrentActivity());
+    }
+
+    protected boolean hasScanPermissions() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (
+                    context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
+                            context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
+                    ) {
+                return false; // Don't start scanning if we are not allowed to use the location.
+            }
+        }
+        return true;
     }
 
     /**
@@ -239,16 +270,6 @@ public abstract class ReelyAwareApplicationCallback implements Application.Activ
     }
 
     /**
-     * Find out if an {@link Activity} implements {@link ReelyAwareActivity}
-     *
-     * @param activity The {@link Activity}
-     * @return true if the {@link Activity} implements {@link ReelyAwareActivity}, false if not.
-     */
-    protected static boolean isReelyAware(Activity activity) {
-        return activity != null && ReelyAwareActivity.class.isInstance(activity);
-    }
-
-    /**
      * ************* PRIVATE STUFF ******************
      */
 
@@ -271,11 +292,7 @@ public abstract class ReelyAwareApplicationCallback implements Application.Activ
      */
     @DebugLog
     protected void onBleServiceBound() {
-        if (shouldStartScan()) {
-            updateScanType(getScanType());
-            updateScanFilter(getScanFilter());
-            startScan();
-        }
+        startScan();
     }
 
     final class BleServiceConnection implements ServiceConnection {

@@ -16,6 +16,11 @@ public class ReelyAwareApplication extends Application {
         super.onCreate();
         registerActivityLifecycleCallbacks(new ReelyAwareApplicationCallback(this) {
             @Override
+            protected boolean shouldStartScan() {
+                return true;
+            }
+
+            @Override
             public void onActivityCreated(Activity activity, Bundle bundle) {
 
             }

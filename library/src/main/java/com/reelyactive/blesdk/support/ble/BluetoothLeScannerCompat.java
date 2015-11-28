@@ -25,6 +25,7 @@ package com.reelyactive.blesdk.support.ble;/*
 
 import android.app.AlarmManager;
 import android.app.PendingIntent;
+import android.os.Build;
 
 import com.reelyactive.blesdk.support.ble.util.Clock;
 import com.reelyactive.blesdk.support.ble.util.Logger;
@@ -67,20 +68,37 @@ public abstract class BluetoothLeScannerCompat {
     // Low Latency: 1.67 second period with 1.5 seconds active (90% duty cycle)
   /* @VisibleForTesting */ static final int LOW_LATENCY_IDLE_MILLIS = 167;
     /* @VisibleForTesting */ static final int LOW_LATENCY_ACTIVE_MILLIS = 1500;
-
+    // Alarm Scan variables
+    private final Clock clock;
+    private final AlarmManager alarmManager;
+    private final PendingIntent alarmIntent;
+    // Milliseconds to wait before considering a device lost. If set to a negative number
+    // SCAN_LOST_CYCLES is used to determine when to inform clients about lost events.
+    protected long scanLostOverrideMillis = -1;
     // Default Scan Constants = Balanced
     private int scanIdleMillis = BALANCED_IDLE_MILLIS;
     private int scanActiveMillis = BALANCED_ACTIVE_MILLIS;
-
     // Override values for scan window
     private int overrideScanActiveMillis = -1;
     private int overrideScanIdleMillis;
 
-    // Milliseconds to wait before considering a device lost. If set to a negative number
-    // SCAN_LOST_CYCLES is used to determine when to inform clients about lost events.
-    protected long scanLostOverrideMillis = -1;
+    protected BluetoothLeScannerCompat(Clock clock, AlarmManager alarmManager, PendingIntent alarmIntent) {
+        this.clock = clock;
+        this.alarmManager = alarmManager;
+        this.alarmIntent = alarmIntent;
+    }
 
-    private long alarmIntervalMillis;
+    protected static boolean matchesAnyFilter(List<ScanFilter> filters, ScanResult result) {
+        if (filters == null || filters.isEmpty()) {
+            return true;
+        }
+        for (ScanFilter filter : filters) {
+            if (filter.matches(result)) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     /**
      * Start Bluetooth LE scan with default parameters and no filters.
@@ -134,7 +152,6 @@ public abstract class BluetoothLeScannerCompat {
      * @param callback
      */
     public abstract void stopScan(ScanCallback callback);
-
 
     /**
      * Request matching records in the scanner's list.
@@ -231,23 +248,33 @@ public abstract class BluetoothLeScannerCompat {
     protected void updateRepeatingAlarm() {
         // Apply Scan Mode (Cycle Parameters)
         setScanMode(getMaxPriorityScanMode());
-
         if (!hasClients()) {
             // No listeners.  Remove the repeating alarm, if there is one.
             getAlarmManager().cancel(getAlarmIntent());
-            alarmIntervalMillis = 0;
             Logger.logInfo("Scan : No clients left, canceling alarm.");
         } else {
-            int idleMillis = getScanIdleMillis();
-            int scanPeriod = idleMillis + getScanActiveMillis();
-            if ((idleMillis != 0) && (alarmIntervalMillis != scanPeriod)) {
-                alarmIntervalMillis = scanPeriod;
-                // Specifies a repeating alarm at the scanPeriod, starting immediately.
-                getAlarmManager().setRepeating(AlarmManager.RTC_WAKEUP,
-                        0, alarmIntervalMillis,
-                        getAlarmIntent());
-                Logger.logInfo("Scan alarm setup complete @ " + System.currentTimeMillis());
+            long alarmIntervalMillis = getScanIdleMillis();
+            // Specifies an alarm at the scanPeriod, starting immediately.
+            if (Build.VERSION.SDK_INT > 22) {
+                getAlarmManager().setExact(
+                        AlarmManager.RTC_WAKEUP,
+                        System.currentTimeMillis() + alarmIntervalMillis,
+                        getAlarmIntent()
+                );
+            } else if (Build.VERSION.SDK_INT > 18) {
+                getAlarmManager().setExact(
+                        AlarmManager.RTC_WAKEUP,
+                        System.currentTimeMillis() + alarmIntervalMillis,
+                        getAlarmIntent()
+                );
+            } else {
+                getAlarmManager().set(
+                        AlarmManager.RTC_WAKEUP,
+                        System.currentTimeMillis() + alarmIntervalMillis,
+                        getAlarmIntent()
+                );
             }
+            Logger.logInfo("Scan alarm setup complete @ " + System.currentTimeMillis() + " (" + (alarmIntervalMillis) + ")");
         }
     }
 
@@ -276,29 +303,21 @@ public abstract class BluetoothLeScannerCompat {
         }
     }
 
-
-    protected static boolean matchesAnyFilter(List<ScanFilter> filters, ScanResult result) {
-        if (filters == null || filters.isEmpty()) {
-            return true;
-        }
-        for (ScanFilter filter : filters) {
-            if (filter.matches(result)) {
-                return true;
-            }
-        }
-        return false;
+    protected Clock getClock() {
+        return clock;
     }
 
+    protected AlarmManager getAlarmManager() {
+        return alarmManager;
+    }
 
-    protected abstract Clock getClock();
+    protected PendingIntent getAlarmIntent() {
+        return alarmIntent;
+    }
 
     protected abstract int getMaxPriorityScanMode();
 
     protected abstract boolean hasClients();
-
-    protected abstract AlarmManager getAlarmManager();
-
-    protected abstract PendingIntent getAlarmIntent();
 
     protected abstract void onNewScanCycle();
 

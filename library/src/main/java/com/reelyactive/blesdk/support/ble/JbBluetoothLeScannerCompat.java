@@ -58,39 +58,13 @@ import java.util.concurrent.TimeUnit;
  */
 class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
 
-    /**
-     * Wraps user requests and stores the list of filters and callbacks. Also saves a set of
-     * addresses for which any of the filters have matched in order to do lost processing.
-     */
-    private static class ScanClient {
-        final List<ScanFilter> filtersList;
-        final Set<String> addressesSeen;
-        final ScanCallback callback;
-        final ScanSettings settings;
-
-        ScanClient(ScanSettings settings, List<ScanFilter> filters, ScanCallback callback) {
-            this.settings = settings;
-            this.filtersList = filters;
-            this.addressesSeen = new HashSet<String>();
-            this.callback = callback;
-        }
-    }
-
-    // Alarm Scan variables
-    private final Clock clock;
-    private final AlarmManager alarmManager;
-    private final PendingIntent alarmIntent;
-
     // Map of BD_ADDR->com.reelyactive.blesdk.support.ble.ScanResult for replay to new registrations.
     // Entries are evicted after SCAN_LOST_CYCLES cycles.
   /* @VisibleForTesting */ final HashMap<String, ScanResult> recentScanResults;
-
-    private final BluetoothAdapter bluetoothAdapter;
     /* @VisibleForTesting */ final HashMap<ScanCallback, ScanClient> serialClients;
+    private final BluetoothAdapter bluetoothAdapter;
     private BluetoothCrashResolver crashResolver;
-
     private Handler mainHandler;
-
     /**
      * The Bluetooth LE callback which will be registered with the OS,
      * to be fired on device discovery.
@@ -108,7 +82,7 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
                  */
                 @Override
                 public void onLeScan(BluetoothDevice device, int rssi, byte[] scanRecordBytes) {
-                    long currentTimeInNanos = TimeUnit.MILLISECONDS.toNanos(clock.currentTimeMillis());
+                    long currentTimeInNanos = TimeUnit.MILLISECONDS.toNanos(getClock().currentTimeMillis());
                     ScanResult result = new ScanResult(device, ScanRecord.parseFromBytes(scanRecordBytes), rssi,
                             currentTimeInNanos);
                     onScanResult(device.getAddress(), result);
@@ -137,13 +111,11 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
      */
     JbBluetoothLeScannerCompat(BluetoothManager manager, AlarmManager alarmManager,
                                Clock clock, PendingIntent alarmIntent) {
+        super(clock, alarmManager, alarmIntent);
         Logger.logDebug("BLE 'JB' hardware access layer activated");
         this.bluetoothAdapter = manager.getAdapter();
         this.serialClients = new HashMap<ScanCallback, ScanClient>();
         this.recentScanResults = new HashMap<String, ScanResult>();
-        this.alarmManager = alarmManager;
-        this.alarmIntent = alarmIntent;
-        this.clock = clock;
     }
 
     /**
@@ -191,6 +163,7 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
                     }
                 });
             }
+            updateRepeatingAlarm();
         }
         Logger.logDebug("Stopping BLE Active Scan Cycle.");
     }
@@ -299,11 +272,6 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
         return true;
     }
 
-    @Override
-    public Clock getClock() {
-        return clock;
-    }
-
     /**
      * Stop scanning.
      *
@@ -337,7 +305,6 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
         }
     }
 
-
     private int getScanModePriority(int mode) {
         switch (mode) {
             case ScanSettings.SCAN_MODE_LOW_LATENCY:
@@ -365,27 +332,9 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
         return maxPriority;
     }
 
-    /**
-     * Calculates the number of milliseconds since this device was booted up.
-     * (Not a value that can be used as a real timestamp, but suitable for comparisons.)
-     */
-    private long millisecondsSinceBoot() {
-        return TimeUnit.NANOSECONDS.toMillis(clock.elapsedRealtimeNanos());
-    }
-
     @Override
     protected boolean hasClients() {
         return !serialClients.isEmpty();
-    }
-
-    @Override
-    protected AlarmManager getAlarmManager() {
-        return alarmManager;
-    }
-
-    @Override
-    protected PendingIntent getAlarmIntent() {
-        return alarmIntent;
     }
 
     @Override
@@ -396,5 +345,23 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
     @Override
     protected Collection<ScanResult> getRecentScanResults() {
         return recentScanResults.values();
+    }
+
+    /**
+     * Wraps user requests and stores the list of filters and callbacks. Also saves a set of
+     * addresses for which any of the filters have matched in order to do lost processing.
+     */
+    private static class ScanClient {
+        final List<ScanFilter> filtersList;
+        final Set<String> addressesSeen;
+        final ScanCallback callback;
+        final ScanSettings settings;
+
+        ScanClient(ScanSettings settings, List<ScanFilter> filters, ScanCallback callback) {
+            this.settings = settings;
+            this.filtersList = filters;
+            this.addressesSeen = new HashSet<String>();
+            this.callback = callback;
+        }
     }
 }
