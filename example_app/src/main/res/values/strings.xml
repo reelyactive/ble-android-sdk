@@ -6,5 +6,7 @@
     <string name="simple">ReelySimpleScan</string>
     <string name="start_ble_scan">Start scan</string>
     <string name="stop_ble_scan">Stop scan</string>
+    <string name="location_permission">Your location is necessary for the application to scan beacons</string>
+    <string name="ok">OK</string>
 
 </resources>

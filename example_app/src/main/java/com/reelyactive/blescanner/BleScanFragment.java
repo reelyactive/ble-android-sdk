@@ -1,9 +1,12 @@
 package com.reelyactive.blescanner;
 
-import android.app.Activity;
+import android.Manifest;
 import android.content.Context;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.ParcelUuid;
+import android.support.design.widget.Snackbar;
+import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.Fragment;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -22,23 +25,28 @@ import com.reelyactive.blesdk.support.ble.ScanSettings;
 import java.util.Arrays;
 
 public class BleScanFragment extends Fragment {
-
-    private Context mContext;
+    private static final int REQUEST_CODE_LOCATION = 42;
     private BluetoothLeScannerCompat scanner;
     private boolean isScanning;
     private ScanCallback scanCallback;
     private Button scanButton;
     private BleScanResultAdapter adapter;
     private ListView list;
+    private boolean permissionChecked = false;
 
     public BleScanFragment() {
     }
 
     @Override
-    public void onAttach(Activity activity) {
-        super.onAttach(activity);
-        mContext = activity.getApplicationContext();
-        scanner = BluetoothLeScannerCompatProvider.getBluetoothLeScannerCompat(mContext);
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setRetainInstance(true);
+    }
+
+    @Override
+    public void onAttach(Context context) {
+        super.onAttach(context);
+        scanner = BluetoothLeScannerCompatProvider.getBluetoothLeScannerCompat(getContext());
         isScanning = false;
         scanCallback = new ScanCallback() {
             @Override
@@ -70,7 +78,7 @@ public class BleScanFragment extends Fragment {
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View rootView = inflater.inflate(R.layout.fragment_ble_scan, container, false);
-        adapter = new BleScanResultAdapter(mContext);
+        adapter = new BleScanResultAdapter(getContext());
         list = (ListView) rootView.findViewById(R.id.ble_scan_results);
         list.setAdapter(adapter);
         scanButton = (Button) rootView.findViewById(R.id.start_ble_scan_btn);
@@ -100,5 +108,38 @@ public class BleScanFragment extends Fragment {
             }
         });
         return rootView;
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        if (!permissionChecked && ActivityCompat.checkSelfPermission(getContext(), Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, REQUEST_CODE_LOCATION);
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        switch (requestCode) {
+            case REQUEST_CODE_LOCATION:
+                permissionChecked = true;
+                if (ActivityCompat.shouldShowRequestPermissionRationale(getActivity(), Manifest.permission.ACCESS_COARSE_LOCATION)) {
+                    Snackbar
+                            .make((View) list.getParent(), R.string.location_permission, Snackbar.LENGTH_INDEFINITE)
+                            .setAction(
+                                    R.string.ok,
+                                    new View.OnClickListener() {
+                                        @Override
+                                        public void onClick(View v) {
+                                            requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, REQUEST_CODE_LOCATION);
+                                        }
+                                    }
+                            ).show();
+                }
+                break;
+            default:
+                super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+                break;
+        }
     }
 }
