@@ -12,6 +12,8 @@ import android.os.ParcelUuid;
 
 import com.reelyactive.blesdk.support.ble.ScanResult;
 
+import java.util.List;
+
 import hugo.weaving.DebugLog;
 
 /**
@@ -42,7 +44,7 @@ public class LBleAdvertiser extends BleAdvertiser {
 
     @Override
     @DebugLog
-    public void startAdvertising(String uuid, ScanResult closestBeaconId, String fallbackUrl) {
+    public void startAdvertising(String uuid, List<ScanResult> closestBeaconId, String fallbackUrl) {
         stopAdvertising();
         advertiser.startAdvertising(
                 new AdvertiseSettings.Builder().setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_BALANCED).build(),

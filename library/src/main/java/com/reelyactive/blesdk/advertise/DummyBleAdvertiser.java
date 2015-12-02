@@ -9,6 +9,7 @@ import com.reelyactive.blesdk.support.ble.ScanResult;
 import com.reelyactive.blesdk.support.ble.ScanResultParser;
 import com.reelyactive.blesdk.support.ble.util.BluetoothInterface;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -20,7 +21,9 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
 import java.util.TimeZone;
 
@@ -29,14 +32,11 @@ import java.util.TimeZone;
  */
 public class DummyBleAdvertiser extends BleAdvertiser {
     private final Context context;
-    private String uuid;
-    private ScanResult closestBeacon;
-
     private final Worker worker;
-
-    private boolean advertising = false;
-
     private final AdvertisingRunnable runnable;
+    private String uuid;
+    private List<ScanResult> closestBeacon;
+    private boolean advertising = false;
     private String url;
 
     public DummyBleAdvertiser(Context context) {
@@ -65,13 +65,6 @@ public class DummyBleAdvertiser extends BleAdvertiser {
                             "        }," +
                             "        \"timestamp\":\"<DATE>\"," +
                             "        \"radioDecodings\":[" +
-                            "            {" +
-                            "                \"rssi\":0," +
-                            "                \"identifier\":{" +
-                            "                    \"type\": \"EUI-64\"," +
-                            "                    \"value\": \"<ID_DU_BEACON>\"" +
-                            "                }" +
-                            "            }" +
                             "        ]" +
                             "    }" +
                             "}"
@@ -82,19 +75,37 @@ public class DummyBleAdvertiser extends BleAdvertiser {
         return null;
     }
 
+    private JSONObject getRadioDecodingBase() {
+        try {
+            return new JSONObject(
+                    "            {" +
+                            "                \"rssi\":0," +
+                            "                \"identifier\":{" +
+                            "                    \"type\": \"EUI-64\"," +
+                            "                    \"value\": \"<ID_DU_BEACON>\"" +
+                            "                }" +
+                            "            }"
+            );
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
     @Override
-    public void startAdvertising(String uuid, ScanResult closestBeacon, String fallbackUrl) {
+    public void startAdvertising(String uuid, List<ScanResult> closestBeacon, String fallbackUrl) {
         if (Looper.myLooper() != Looper.getMainLooper()) {
             throw new RuntimeException("Do not try to run from outside the main thread !");
         }
         this.uuid = uuid;
-        this.closestBeacon = closestBeacon;
+        synchronized (this) {
+            this.closestBeacon = closestBeacon;
+        }
         this.url = fallbackUrl;
         if (!advertising) {
             advertising = true;
             worker.getHandler().post(runnable);
         }
-
     }
 
     @Override
@@ -105,9 +116,23 @@ public class DummyBleAdvertiser extends BleAdvertiser {
         advertising = false;
     }
 
+    @Override
+    public void updateBeacons(List<ScanResult> closestBeacon) {
+        synchronized (this) {
+            this.closestBeacon = closestBeacon;
+        }
+    }
+
     private void advertise() {
-        if (url == null || closestBeacon == null) {
-            advertising = false;
+        List<ScanResult> results;
+        synchronized (this) {
+            if (closestBeacon != null) {
+                results = new ArrayList<>(closestBeacon);
+            } else {
+                return;
+            }
+        }
+        if (url == null || results.size() == 0) {
             return;
         }
         URL url;
@@ -122,8 +147,13 @@ public class DummyBleAdvertiser extends BleAdvertiser {
             JSONObject jsonObject = getJsonBase();
             jsonObject.getJSONObject("tiraid").getJSONObject("identifier").put("value", BluetoothInterface.getMacAddress().replace(":", "").toLowerCase());
             jsonObject.getJSONObject("tiraid").getJSONObject("identifier").getJSONObject("advData").put("complete128BitUUIDs", uuid);
-            jsonObject.getJSONObject("tiraid").getJSONArray("radioDecodings").getJSONObject(0).getJSONObject("identifier").put("value", ScanResultParser.getSystemId(closestBeacon));
-            jsonObject.getJSONObject("tiraid").getJSONArray("radioDecodings").getJSONObject(0).getJSONObject("identifier").put("rssi", 127 + closestBeacon.getRssi());
+            JSONArray decodings = jsonObject.getJSONObject("tiraid").getJSONArray("radioDecodings");
+            for (ScanResult result : results) {
+                JSONObject decoding = getRadioDecodingBase();
+                decoding.getJSONObject("identifier").put("value", ScanResultParser.getSystemId(result));
+                decoding.getJSONObject("identifier").put("rssi", 127 + result.getRssi());
+                decodings.put(decoding);
+            }
             SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.ENGLISH);
             df.setTimeZone(TimeZone.getTimeZone("Z"));
             jsonObject.getJSONObject("tiraid").put("timestamp", df.format(new Date(System.currentTimeMillis())));
@@ -159,17 +189,6 @@ public class DummyBleAdvertiser extends BleAdvertiser {
         }
     }
 
-    private class AdvertisingRunnable implements Runnable {
-
-        @Override
-        public void run() {
-            if (advertising) {
-                advertise();
-                worker.getHandler().postDelayed(runnable, 5 * 1000);
-            }
-        }
-    }
-
     static class Worker extends HandlerThread {
         public Handler mHandler;
 
@@ -183,6 +202,17 @@ public class DummyBleAdvertiser extends BleAdvertiser {
 
         public synchronized void waitUntilReady() {
             mHandler = new Handler(getLooper());
+        }
+    }
+
+    private class AdvertisingRunnable implements Runnable {
+
+        @Override
+        public void run() {
+            if (advertising) {
+                advertise();
+                worker.getHandler().postDelayed(runnable, 5 * 1000);
+            }
         }
     }
 }

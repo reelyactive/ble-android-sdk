@@ -54,7 +54,7 @@ class LBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
 
     /**
      * Package-protected constructor, used by {@link BluetoothLeScannerCompatProvider}.
-     * <p/>
+     * <p>
      * Cannot be called from emulated devices that don't implement a BluetoothAdapter.
      */
     LBluetoothLeScannerCompat(Context context, BluetoothManager manager, AlarmManager alarmManager) {
@@ -266,7 +266,15 @@ class LBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
                 iter.remove();
             }
         }
+
+        callbackCycleCompleted();
         updateRepeatingAlarm();
+    }
+
+    private void callbackCycleCompleted() {
+        for (ScanClient client : callbacksMap.values()) {
+            client.callback.onScanCycleCompleted();
+        }
     }
 
     @Override

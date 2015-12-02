@@ -21,11 +21,6 @@ import hugo.weaving.DebugLog;
 public class BleService extends Service {
     public static final String KEY_FILTER = "filter";
     public static final String KEY_EVENT_DATA = "event_data";
-    /**
-     * Keeps track of all current registered clients.
-     */
-    ArrayList<BleServiceCallback> mClients = new ArrayList<BleServiceCallback>();
-    private BluetoothLeScannerCompat scanner;
     final ScanCallback callback = new ScanCallback();
     final ScanSettings lowPowerScan = new ScanSettings.Builder() //
             .setCallbackType(ScanSettings.CALLBACK_TYPE_FIRST_MATCH | ScanSettings.CALLBACK_TYPE_MATCH_LOST) //
@@ -37,13 +32,16 @@ public class BleService extends Service {
             .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY) //
             .setScanResultType(ScanSettings.SCAN_RESULT_TYPE_FULL) //
             .build();
+    private final IBinder binder = new LocalBinder();
+    /**
+     * Keeps track of all current registered clients.
+     */
+    ArrayList<BleServiceCallback> mClients = new ArrayList<BleServiceCallback>();
+    private BluetoothLeScannerCompat scanner;
     private ScanSettings currentSettings;
     private ScanSettings nextSettings;
     private ScanFilter currentFilter;
     private ScanFilter nextFilter;
-
-
-    private final IBinder binder = new LocalBinder();
 
     @Override
     @DebugLog
@@ -58,52 +56,12 @@ public class BleService extends Service {
     }
 
     /**
-     * Class used for the client Binder.  Because we know this service always
-     * runs in the same process as its clients, we don't need to deal with IPC.
-     */
-    public class LocalBinder extends Binder {
-        public BleService getService() {
-            // Return this instance of LocalService so clients can call public methods
-            return BleService.this;
-        }
-    }
-
-    /**
      * When binding to the service, we return an interface to our messenger
      * for sending messages to the service.
      */
     @Override
     public IBinder onBind(Intent intent) {
         return binder;
-    }
-
-    public static enum Event {
-        SCAN_STARTED,
-        SCAN_STOPPED,
-        IN_REGION,
-        OUT_REGION,
-        UNKNOWN;
-        private static Event[] allValues = values();
-
-        public static Event fromOrdinal(int n) {
-            if (n >= 0 || n < UNKNOWN.ordinal()) {
-                return allValues[n];
-            }
-            return UNKNOWN;
-        }
-    }
-
-    public static enum ScanType {
-        LOW_POWER,
-        ACTIVE;
-        private static ScanType[] allValues = values();
-
-        public static ScanType fromOrdinal(int n) throws IllegalArgumentException {
-            if (n < 0 || n >= allValues.length) {
-                return LOW_POWER;
-            }
-            return allValues[n];
-        }
     }
 
     @DebugLog
@@ -162,11 +120,57 @@ public class BleService extends Service {
         }
     }
 
+    public static enum Event {
+        SCAN_STARTED,
+        SCAN_STOPPED,
+        IN_REGION,
+        OUT_REGION,
+        CYCLE_COMPLETED,
+        UNKNOWN;
+        private static Event[] allValues = values();
+
+        public static Event fromOrdinal(int n) {
+            if (n >= 0 || n < UNKNOWN.ordinal()) {
+                return allValues[n];
+            }
+            return UNKNOWN;
+        }
+    }
+
+    public static enum ScanType {
+        LOW_POWER,
+        ACTIVE;
+        private static ScanType[] allValues = values();
+
+        public static ScanType fromOrdinal(int n) throws IllegalArgumentException {
+            if (n < 0 || n >= allValues.length) {
+                return LOW_POWER;
+            }
+            return allValues[n];
+        }
+    }
+
+    /**
+     * Class used for the client Binder.  Because we know this service always
+     * runs in the same process as its clients, we don't need to deal with IPC.
+     */
+    public class LocalBinder extends Binder {
+        public BleService getService() {
+            // Return this instance of LocalService so clients can call public methods
+            return BleService.this;
+        }
+    }
+
     class ScanCallback extends com.reelyactive.blesdk.support.ble.ScanCallback {
         @Override
         @DebugLog
         public void onScanResult(int callbackType, ScanResult result) {
             notifyEvent(callbackType != ScanSettings.CALLBACK_TYPE_MATCH_LOST ? Event.IN_REGION : Event.OUT_REGION, result);
+        }
+
+        @Override
+        public void onScanCycleCompleted() {
+            notifyEvent(Event.CYCLE_COMPLETED);
         }
     }
 }

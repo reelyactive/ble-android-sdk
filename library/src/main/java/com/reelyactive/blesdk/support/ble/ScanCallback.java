@@ -75,4 +75,8 @@ public abstract class ScanCallback {
      */
     public void onScanFailed(@SuppressWarnings("unused") int errorCode) {
     }
+
+    public void onScanCycleCompleted(){
+
+    }
 }

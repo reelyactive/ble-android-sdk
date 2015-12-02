@@ -160,6 +160,7 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
                     @Override
                     public void run() {
                         onScanCycleComplete();
+                        callbackCycleCompleted();
                     }
                 });
             }
@@ -182,6 +183,12 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
                     Logger.logError("Failure while sending 'lost' scan result to listener", e);
                 }
             }
+        }
+    }
+
+    private void callbackCycleCompleted() {
+        for (ScanClient client : serialClients.values()) {
+            client.callback.onScanCycleCompleted();
         }
     }
 
