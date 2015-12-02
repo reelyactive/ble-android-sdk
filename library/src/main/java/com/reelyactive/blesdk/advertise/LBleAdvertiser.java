@@ -14,8 +14,6 @@ import com.reelyactive.blesdk.support.ble.ScanResult;
 
 import java.util.List;
 
-import hugo.weaving.DebugLog;
-
 /**
  * Created by saiimons on 15-03-09.
  */
@@ -25,13 +23,11 @@ public class LBleAdvertiser extends BleAdvertiser {
     private final Context context;
     private final AdvertiseCallback callback = new AdvertiseCallback() {
         @Override
-        @DebugLog
         public void onStartSuccess(AdvertiseSettings settingsInEffect) {
             super.onStartSuccess(settingsInEffect);
         }
 
         @Override
-        @DebugLog
         public void onStartFailure(int errorCode) {
             super.onStartFailure(errorCode);
         }
@@ -43,7 +39,6 @@ public class LBleAdvertiser extends BleAdvertiser {
     }
 
     @Override
-    @DebugLog
     public void startAdvertising(String uuid, List<ScanResult> closestBeaconId, String fallbackUrl) {
         stopAdvertising();
         advertiser.startAdvertising(
@@ -54,7 +49,6 @@ public class LBleAdvertiser extends BleAdvertiser {
     }
 
     @Override
-    @DebugLog
     public void stopAdvertising() {
         try {
             advertiser.stopAdvertising(callback);

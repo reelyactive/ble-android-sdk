@@ -12,7 +12,6 @@ import android.os.Build;
 import android.os.IBinder;
 import android.os.ParcelUuid;
 import android.support.v4.content.ContextCompat;
-import android.util.Log;
 
 import com.reelyactive.blesdk.service.BleService;
 import com.reelyactive.blesdk.service.BleServiceCallback;
@@ -22,15 +21,13 @@ import com.reelyactive.blesdk.support.ble.util.Logger;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
-import hugo.weaving.DebugLog;
-
 /**
  * This class provides a convenient way to make your application aware of any Reelceivers.
- * <p/>
+ * <p>
  * Register it using {@link android.app.Application#registerActivityLifecycleCallbacks(Application.ActivityLifecycleCallbacks)}<br/>
- * <p/>
+ * <p>
  * Extend it to customize the behaviour of your application.
- * <p/>
+ * <p>
  * The default behaviour is to bind to the {@link BleService} as soon as the app is created.
  *
  * @see android.app.Application.ActivityLifecycleCallbacks
@@ -74,7 +71,6 @@ public abstract class ReelyAwareApplicationCallback implements Application.Activ
      */
     @Override
     public void onActivityResumed(Activity activity) {
-        Log.d(TAG, "activity resumed");
         current = activity;
         activityCount.incrementAndGet();
         if (!startScan()) {
@@ -90,7 +86,6 @@ public abstract class ReelyAwareApplicationCallback implements Application.Activ
      */
     @Override
     public void onActivityPaused(Activity activity) {
-        Log.d(TAG, "activity paused");
         current = null;
         activityCount.decrementAndGet();
         if (!startScan()) {
@@ -194,32 +189,27 @@ public abstract class ReelyAwareApplicationCallback implements Application.Activ
         boolean processed = isReelyAware(getCurrentActivity());
         switch (event) {
             case IN_REGION:
-                Log.d(TAG, "Application entered region");
                 if (processed) {
                     ((ReelyAwareActivity) getCurrentActivity()).onEnterRegion((ScanResult) data);
                 }
                 break;
             case OUT_REGION:
-                Log.d(TAG, "Application left region");
                 if (processed) {
                     ((ReelyAwareActivity) getCurrentActivity()).onLeaveRegion((ScanResult) data);
                 }
                 break;
             case SCAN_STARTED:
-                Log.d(TAG, "Scan started");
                 if (processed) {
                     ((ReelyAwareActivity) getCurrentActivity()).onScanStarted();
                 }
                 break;
             case SCAN_STOPPED:
-                Log.d(TAG, "Scan stopped");
                 if (processed) {
                     ((ReelyAwareActivity) getCurrentActivity()).onScanStopped();
                 }
                 break;
             default:
                 processed = false;
-                Log.d(TAG, "Unhandled BLE Event : " + event);
                 break;
         }
         return processed;
@@ -270,11 +260,10 @@ public abstract class ReelyAwareApplicationCallback implements Application.Activ
         return bound;
     }
 
-    /**
+    /*
      * ************* PRIVATE STUFF ******************
      */
 
-    @DebugLog
     protected boolean bindBleService() {
         return context.bindService(new Intent(context, BleService.class), serviceConnection, Context.BIND_AUTO_CREATE);
     }
@@ -291,7 +280,6 @@ public abstract class ReelyAwareApplicationCallback implements Application.Activ
      * This method is called when the {@link BleService is available}.<br/>
      * The default behaviour is to start a scan.
      */
-    @DebugLog
     protected void onBleServiceBound() {
         startScan();
     }

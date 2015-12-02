@@ -52,17 +52,15 @@ public class BleScanFragment extends Fragment {
             @Override
             public void onScanResult(int callbackType, ScanResult result) {
                 if (callbackType == ScanSettings.CALLBACK_TYPE_FIRST_MATCH) {
-                    Log.d("FOUND", result.toString());
                     adapter.addItem(result);
                 } else {
-                    Log.d("LOST", result.toString());
                     adapter.removeItem(result);
                 }
             }
 
             @Override
             public void onScanFailed(int errorCode) {
-                Log.d("SCAN", "Failed " + errorCode);
+                Log.e("SCAN", "Failed " + errorCode);
             }
         };
     }

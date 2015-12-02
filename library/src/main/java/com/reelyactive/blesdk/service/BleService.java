@@ -16,8 +16,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import hugo.weaving.DebugLog;
-
 public class BleService extends Service {
     public static final String KEY_FILTER = "filter";
     public static final String KEY_EVENT_DATA = "event_data";
@@ -44,13 +42,11 @@ public class BleService extends Service {
     private ScanFilter nextFilter;
 
     @Override
-    @DebugLog
     public void onCreate() {
         scanner = BluetoothLeScannerCompatProvider.getBluetoothLeScannerCompat(getApplicationContext());
     }
 
     @Override
-    @DebugLog
     public void onDestroy() {
         // TODO make it possible to kill the scanner.
     }
@@ -64,17 +60,14 @@ public class BleService extends Service {
         return binder;
     }
 
-    @DebugLog
     public void registerClient(BleServiceCallback client) {
         mClients.add(client);
     }
 
-    @DebugLog
     public void unregisterClient(BleServiceCallback client) {
         mClients.remove(client);
     }
 
-    @DebugLog
     public void startScan() {
         nextSettings = nextSettings == null ? lowPowerScan : nextSettings;
         nextFilter = nextFilter == null ? (currentFilter == null ? new ScanFilter.Builder().build() : currentFilter) : nextFilter;
@@ -87,7 +80,6 @@ public class BleService extends Service {
         currentFilter = nextFilter;
     }
 
-    @DebugLog
     public void stopScan() {
         currentFilter = null;
         currentSettings = null;
@@ -95,17 +87,14 @@ public class BleService extends Service {
         notifyEvent(Event.SCAN_STOPPED);
     }
 
-    @DebugLog
     public void setScanType(ScanType scanType) {
         nextSettings = ScanType.ACTIVE == scanType ? higPowerScan : lowPowerScan;
     }
 
-    @DebugLog
     public void setScanFilter(ScanFilter scanFilter) {
         nextFilter = scanFilter;
     }
 
-    @DebugLog
     public List<ScanResult> getMatchingRecentResults(List<ScanFilter> filters) {
         return scanner.getMatchingRecords(filters);
     }
@@ -163,7 +152,6 @@ public class BleService extends Service {
 
     class ScanCallback extends com.reelyactive.blesdk.support.ble.ScanCallback {
         @Override
-        @DebugLog
         public void onScanResult(int callbackType, ScanResult result) {
             notifyEvent(callbackType != ScanSettings.CALLBACK_TYPE_MATCH_LOST ? Event.IN_REGION : Event.OUT_REGION, result);
         }
