@@ -274,7 +274,6 @@ public abstract class BluetoothLeScannerCompat {
                         getAlarmIntent()
                 );
             }
-            Logger.logInfo("Scan alarm setup complete @ " + System.currentTimeMillis() + " (" + (alarmIntervalMillis) + ")");
         }
     }
 
