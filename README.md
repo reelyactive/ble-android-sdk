@@ -11,7 +11,7 @@ Have a look at the [javadoc](http://reelyactive.github.io/ble-android-sdk) !
 Add it to your project :
 
 ```groovy
-compile 'com.reelyactive:blesdk:0.4.1@aar'
+compile 'com.reelyactive:blesdk:0.5.0@aar'
 ```
 
 ## Scan with a simple API
