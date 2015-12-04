@@ -146,12 +146,12 @@ public class DummyBleAdvertiser extends BleAdvertiser {
             conn.setRequestProperty("Content-Type", "application/json");
             JSONObject jsonObject = getJsonBase();
             jsonObject.getJSONObject("tiraid").getJSONObject("identifier").put("value", BluetoothInterface.getMacAddress().replace(":", "").toLowerCase());
-            jsonObject.getJSONObject("tiraid").getJSONObject("identifier").getJSONObject("advData").put("complete128BitUUIDs", uuid);
+            jsonObject.getJSONObject("tiraid").getJSONObject("identifier").getJSONObject("advData").put("complete128BitUUIDs", uuid.replaceAll("[\\W.]", ""));
             JSONArray decodings = jsonObject.getJSONObject("tiraid").getJSONArray("radioDecodings");
             for (ScanResult result : results) {
                 JSONObject decoding = getRadioDecodingBase();
                 decoding.getJSONObject("identifier").put("value", ScanResultParser.getSystemId(result));
-                decoding.getJSONObject("identifier").put("rssi", 127 + result.getRssi());
+                decoding.put("rssi", 127 + result.getRssi());
                 decodings.put(decoding);
             }
             SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.ENGLISH);
