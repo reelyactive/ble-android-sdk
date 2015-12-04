@@ -1,3 +1,16 @@
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.jakewharton.hugo:hugo-plugin:1.2.1'
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
 apply plugin: 'com.android.library'
 apply plugin: 'com.github.dcendents.android-maven'
 apply plugin: 'com.jfrog.bintray'
@@ -9,22 +22,13 @@ project.archivesBaseName = properties['project.artifactId']
 def isRelease = !((String) project.properties.get('project.version')).contains("SNAPSHOT")
 def isSnapshot = !isRelease
 
-buildscript {
-    repositories {
-        mavenCentral()
-    }
-    dependencies {
-        classpath 'com.jakewharton.hugo:hugo-plugin:1.2.1'
-    }
-}
-
 android {
-    compileSdkVersion Integer.parseInt("" + project.properties.get('android.build_sdk_version'))
-    buildToolsVersion project.properties.get('android.build_tools_version')
+    compileSdkVersion rootProject.ext.build_sdk_version
+    buildToolsVersion rootProject.ext.buildToolsVersion
 
     defaultConfig {
-        minSdkVersion project.properties.get('android.build_min_sdk_version')
-        targetSdkVersion project.properties.get('android.build_target_sdk_version')
+        minSdkVersion rootProject.ext.build_min_sdk_version
+        targetSdkVersion rootProject.ext.build_target_sdk_version
     }
     buildTypes {
         release {

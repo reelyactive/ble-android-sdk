@@ -11,13 +11,13 @@ apply plugin: 'com.android.application'
 apply plugin: 'com.jakewharton.hugo'
 
 android {
-    compileSdkVersion Integer.parseInt("" + project.properties.get('android.build_sdk_version'))
-    buildToolsVersion project.properties.get('android.build_tools_version')
+    compileSdkVersion rootProject.ext.build_sdk_version
+    buildToolsVersion rootProject.ext.buildToolsVersion
 
     defaultConfig {
         applicationId "com.reelyactive.blescanner"
-        minSdkVersion project.properties.get('android.build_min_sdk_version')
-        targetSdkVersion project.properties.get('android.build_target_sdk_version')
+        minSdkVersion rootProject.ext.build_min_sdk_version
+        targetSdkVersion rootProject.ext.build_target_sdk_version
         versionCode 1
         versionName "1.0"
     }
