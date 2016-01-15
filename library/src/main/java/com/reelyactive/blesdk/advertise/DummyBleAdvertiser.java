@@ -22,6 +22,8 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -135,6 +137,12 @@ public class DummyBleAdvertiser extends BleAdvertiser {
         if (url == null || results.size() == 0) {
             return;
         }
+        Collections.sort(results, new Comparator<ScanResult>() {
+            @Override
+            public int compare(ScanResult lhs, ScanResult rhs) {
+                return rhs.getRssi() - lhs.getRssi();
+            }
+        });
         URL url;
         OutputStream os = null;
         BufferedReader is = null;
