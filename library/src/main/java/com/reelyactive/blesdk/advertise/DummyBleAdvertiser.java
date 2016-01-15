@@ -145,7 +145,7 @@ public class DummyBleAdvertiser extends BleAdvertiser {
             conn.setDoOutput(true);
             conn.setRequestProperty("Content-Type", "application/json");
             JSONObject jsonObject = getJsonBase();
-            jsonObject.getJSONObject("tiraid").getJSONObject("identifier").put("value", BluetoothInterface.getMacAddress().replace(":", "").toLowerCase());
+            jsonObject.getJSONObject("tiraid").getJSONObject("identifier").put("value", BluetoothInterface.getMacAddress(context).replace(":", "").toLowerCase());
             jsonObject.getJSONObject("tiraid").getJSONObject("identifier").getJSONObject("advData").put("complete128BitUUIDs", uuid.replaceAll("[\\W.]", "").toLowerCase());
             JSONArray decodings = jsonObject.getJSONObject("tiraid").getJSONArray("radioDecodings");
             for (ScanResult result : results) {
