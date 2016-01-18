@@ -14,16 +14,21 @@ public class BluetoothInterface {
     private static final String PREF_NAME = "reelyactive";
     private static final String MAC_PREF = "mac_address";
 
-    public static String getMacAddress(Context context) {
+    public static MacAddress getMacAddress(Context context) {
+        MacAddress address = new MacAddress();
         BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
         if (adapter == null || Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             SharedPreferences preferences = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
             if (!preferences.contains(MAC_PREF)) {
                 preferences.edit().putString(MAC_PREF, randomMACAddress()).apply();
             }
-            return preferences.getString(MAC_PREF, "00:00:00:00:00:00");
+            address.type = "random";
+            address.address = preferences.getString(MAC_PREF, "00:00:00:00:00:00");
+        } else {
+            address.type = "public";
+            address.address = adapter.getAddress();
         }
-        return adapter.getAddress();
+        return address;
     }
 
     private static String randomMACAddress() {
@@ -44,5 +49,10 @@ public class BluetoothInterface {
 
 
         return sb.toString();
+    }
+
+    public static class MacAddress {
+        public String address;
+        public String type;
     }
 }
