@@ -38,6 +38,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -47,14 +48,14 @@ import java.util.concurrent.TimeUnit;
 @TargetApi(Build.VERSION_CODES.LOLLIPOP)
 class LBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
 
-    final HashMap<String, ScanResult> recentScanResults;
+    final ConcurrentHashMap<String, ScanResult> recentScanResults;
     // Alarm Scan variables
     private final Map<ScanCallback, ScanClient> callbacksMap = new HashMap<ScanCallback, ScanClient>();
     private final android.bluetooth.le.BluetoothLeScanner osScanner;
 
     /**
      * Package-protected constructor, used by {@link BluetoothLeScannerCompatProvider}.
-     * <p>
+     * <p/>
      * Cannot be called from emulated devices that don't implement a BluetoothAdapter.
      */
     LBluetoothLeScannerCompat(Context context, BluetoothManager manager, AlarmManager alarmManager) {
@@ -76,7 +77,7 @@ class LBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
         super(clock, alarmManager, alarmIntent);
         Logger.logDebug("BLE 'L' hardware access layer activated");
         this.osScanner = manager.getAdapter().getBluetoothLeScanner();
-        this.recentScanResults = new HashMap<String, ScanResult>();
+        this.recentScanResults = new ConcurrentHashMap<>();
     }
 
     private static android.bluetooth.le.ScanSettings toOs(ScanSettings settings) {
@@ -247,26 +248,23 @@ class LBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
                 }
             }
         }
-        HashMap<String, ScanResult> results = (HashMap<String, ScanResult>) recentScanResults.clone();
-        Iterator<Map.Entry<String, ScanResult>> iter = results.entrySet().iterator();
         long lostTimestampMillis = getLostTimestampMillis();
-
+        Iterator<Map.Entry<String, ScanResult>> iter = recentScanResults.entrySet().iterator();
         // Clear out any expired notifications from the "old sightings" record.
         while (iter.hasNext()) {
             Map.Entry<String, ScanResult> entry = iter.next();
             final String address = entry.getKey();
             final ScanResult savedResult = entry.getValue();
             if (TimeUnit.NANOSECONDS.toMillis(savedResult.getTimestampNanos()) < lostTimestampMillis) {
+                iter.remove();
                 new Handler(Looper.getMainLooper()).post(new Runnable() {
                     @Override
                     public void run() {
                         callbackLostLeScanClients(address, savedResult);
                     }
                 });
-                iter.remove();
             }
         }
-
         callbackCycleCompleted();
         updateRepeatingAlarm();
     }

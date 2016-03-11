@@ -306,8 +306,8 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
             String address = entry.getKey();
             ScanResult savedResult = entry.getValue();
             if (TimeUnit.NANOSECONDS.toMillis(savedResult.getTimestampNanos()) < lostTimestampMillis) {
-                callbackLostLeScanClients(address, savedResult);
                 iter.remove();
+                callbackLostLeScanClients(address, savedResult);
             }
         }
     }
