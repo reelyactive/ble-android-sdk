@@ -14,6 +14,7 @@ package com.reelyactive.blesdk.support.ble;/*
  * limitations under the License.
  */
 
+import android.annotation.TargetApi;
 import android.app.AlarmManager;
 import android.app.PendingIntent;
 import android.bluetooth.BluetoothAdapter;
@@ -21,6 +22,7 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
 import android.content.Context;
 import android.content.Intent;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 
@@ -29,12 +31,13 @@ import com.reelyactive.blesdk.support.ble.util.Logger;
 import com.reelyactive.blesdk.support.ble.util.SystemClock;
 
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -56,12 +59,13 @@ import java.util.concurrent.TimeUnit;
  *
  * @see <a href="http://go/ble-glossary">BLE Glossary</a>
  */
+@TargetApi(Build.VERSION_CODES.JELLY_BEAN_MR2)
 class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
 
     // Map of BD_ADDR->com.reelyactive.blesdk.support.ble.ScanResult for replay to new registrations.
     // Entries are evicted after SCAN_LOST_CYCLES cycles.
-  /* @VisibleForTesting */ final HashMap<String, ScanResult> recentScanResults;
-    /* @VisibleForTesting */ final HashMap<ScanCallback, ScanClient> serialClients;
+  /* @VisibleForTesting */ final Map<String, ScanResult> recentScanResults = new ConcurrentHashMap<>();
+    /* @VisibleForTesting */ final Map<ScanCallback, ScanClient> serialClients = new ConcurrentHashMap<>();
     private final BluetoothAdapter bluetoothAdapter;
     private BluetoothCrashResolver crashResolver;
     private Handler mainHandler;
@@ -114,8 +118,6 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
         super(clock, alarmManager, alarmIntent);
         Logger.logDebug("BLE 'JB' hardware access layer activated");
         this.bluetoothAdapter = manager.getAdapter();
-        this.serialClients = new HashMap<>();
-        this.recentScanResults = new HashMap<>();
     }
 
     /**
@@ -132,14 +134,13 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
     @SuppressWarnings({"WaitNotInLoop", "deprecation"})
     @Override
     protected synchronized void onNewScanCycle() {
-        if (bluetoothAdapter == null) {
-            return;
-        }
         Logger.logDebug("Starting BLE Active Scan Cycle.");
         int activeMillis = getScanActiveMillis();
         if (activeMillis > 0) {
             try {
-                bluetoothAdapter.startLeScan(leScanCallback);
+                if (bluetoothAdapter != null) {
+                    bluetoothAdapter.startLeScan(leScanCallback);
+                }
             } catch (IllegalStateException e) {
                 Logger.logError("Failed to start the scan", e);
             }
@@ -151,7 +152,9 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
                 Logger.logError("Exception in ScanCycle Sleep", e);
             } finally {
                 try {
-                    bluetoothAdapter.stopLeScan(leScanCallback);
+                    if (bluetoothAdapter != null) {
+                        bluetoothAdapter.stopLeScan(leScanCallback);
+                    }
                 } catch (NullPointerException e) {
                     // An NPE is thrown if Bluetooth has been reset since this blocking scan began.
                     Logger.logDebug("NPE thrown in BlockingScanCycle");
@@ -246,11 +249,6 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
     @Override
     public synchronized boolean startScan(List<ScanFilter> filterList, ScanSettings settings,
                                           ScanCallback callback) {
-        return startSerialScan(settings, filterList, callback);
-    }
-
-    private boolean startSerialScan(ScanSettings settings, List<ScanFilter> filterList,
-                                    ScanCallback callback) {
         ScanClient client = new ScanClient(settings, filterList, callback);
         serialClients.put(callback, client);
 
@@ -276,7 +274,6 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
                 }
             }
         }
-
         updateRepeatingAlarm();
         return true;
     }

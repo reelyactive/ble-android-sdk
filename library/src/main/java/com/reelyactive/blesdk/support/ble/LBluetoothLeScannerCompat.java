@@ -33,7 +33,6 @@ import com.reelyactive.blesdk.support.ble.util.SystemClock;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -49,9 +48,8 @@ import java.util.concurrent.TimeUnit;
 @TargetApi(Build.VERSION_CODES.LOLLIPOP)
 class LBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
 
-    final ConcurrentHashMap<String, ScanResult> recentScanResults;
-    // Alarm Scan variables
-    private final Map<ScanCallback, ScanClient> callbacksMap = new HashMap<ScanCallback, ScanClient>();
+    private final Map<String, ScanResult> recentScanResults = new ConcurrentHashMap<>();
+    private final Map<ScanCallback, ScanClient> callbacksMap = new ConcurrentHashMap<>();
     private final android.bluetooth.le.BluetoothLeScanner osScanner;
 
     /**
@@ -83,7 +81,6 @@ class LBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
         } else {
             this.osScanner = null;
         }
-        this.recentScanResults = new ConcurrentHashMap<>();
     }
 
     private static android.bluetooth.le.ScanSettings toOs(ScanSettings settings) {
@@ -168,9 +165,6 @@ class LBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
 
     @Override
     public boolean startScan(List<ScanFilter> filters, ScanSettings settings, ScanCallback callback) {
-        if (osScanner == null) {
-            return false;
-        }
 
         if (callbacksMap.containsKey(callback)) {
             Logger.logInfo("StartScan(): BLE 'L' hardware scan already in progress...");
@@ -187,7 +181,9 @@ class LBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
             for (ScanFilter filter : filters) {
                 Logger.logInfo("\tFilter " + filter);
             }
-            osScanner.startScan(osFilters, osSettings, osCallback);
+            if (osScanner != null) {
+                osScanner.startScan(osFilters, osSettings, osCallback);
+            }
             updateRepeatingAlarm();
             return true;
         } catch (Exception e) {
@@ -198,15 +194,14 @@ class LBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
 
     @Override
     public void stopScan(ScanCallback callback) {
-        if (osScanner == null) {
-            return;
-        }
         android.bluetooth.le.ScanCallback osCallback = callbacksMap.get(callback);
 
         if (osCallback != null) {
             try {
                 Logger.logInfo("Stopping BLE 'L' hardware scan");
-                osScanner.stopScan(osCallback);
+                if (osScanner != null) {
+                    osScanner.stopScan(osCallback);
+                }
             } catch (Exception e) {
                 Logger.logError("Exception caught calling 'L' BluetoothLeScanner.stopScan()", e);
             }
@@ -317,7 +312,7 @@ class LBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
 
         ScanClient(ScanCallback callback, ScanSettings settings) {
             this.settings = settings;
-            this.addressesSeen = new HashSet<String>();
+            this.addressesSeen = new HashSet<>();
             this.callback = callback;
         }
 
