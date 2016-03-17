@@ -40,18 +40,18 @@ import java.util.concurrent.TimeUnit;
 /**
  * Implements Bluetooth LE scan related API on top of
  * {@link android.os.Build.VERSION_CODES#JELLY_BEAN_MR2} and later.
- * <p/>
+ * <p>
  * This class delivers a callback on found, updated, and lost for devices matching a
  * {@link ScanFilter} filter during scan cycles.
- * <p/>
+ * <p>
  * A scan cycle comprises a period when the Bluetooth Adapter is active and a period when the
  * Bluetooth adapter is idle. Having an idle period is energy efficient for long lived scans.
- * <p/>
+ * <p>
  * This class can be accessed on multiple threads:
  * <ul>
  * <li> main thread (user) can call any of the BluetoothLeScanner APIs
- * <li> IntentService worker thread can call {@link #blockingScanCycle}
- * <li> AIDL binder thread can call {@link #leScanCallback.onLeScan}
+ * <li> IntentService worker thread can call {@link #onNewScanCycle()}
+ * <li> AIDL binder thread can call {@link #leScanCallback.onLeScan()}
  * </ul>
  *
  * @see <a href="http://go/ble-glossary">BLE Glossary</a>
@@ -114,8 +114,8 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
         super(clock, alarmManager, alarmIntent);
         Logger.logDebug("BLE 'JB' hardware access layer activated");
         this.bluetoothAdapter = manager.getAdapter();
-        this.serialClients = new HashMap<ScanCallback, ScanClient>();
-        this.recentScanResults = new HashMap<String, ScanResult>();
+        this.serialClients = new HashMap<>();
+        this.recentScanResults = new HashMap<>();
     }
 
     /**
@@ -123,14 +123,18 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
      * com.reelyactive.blesdk.support.ble.ScanWakefulService. When this method ends, the service will signal the ScanWakefulBroadcast
      * receiver to release its wakelock and the phone will enter a sleep phase for the remainder of
      * the BLE scan cycle.
-     * <p/>
+     * <p>
      * This is called on the IntentService handler thread and hence is synchronized.
-     * <p/>
+     * <p>
      * Suppresses the experimental 'wait not in loop' warning because we don't mind exiting early.
      * Suppresses deprecation because this is the compatibility support.
      */
     @SuppressWarnings({"WaitNotInLoop", "deprecation"})
-    synchronized void blockingScanCycle() {
+    @Override
+    protected synchronized void onNewScanCycle() {
+        if (bluetoothAdapter == null) {
+            return;
+        }
         Logger.logDebug("Starting BLE Active Scan Cycle.");
         int activeMillis = getScanActiveMillis();
         if (activeMillis > 0) {
@@ -195,8 +199,6 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
     /**
      * Process a single scan result, sending it directly
      * to any active listeners who want to know.
-     *
-     * @VisibleForTesting
      */
     void onScanResult(final String address, final ScanResult result) {
         mainHandler.post(new Runnable() {
@@ -210,7 +212,7 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
     /**
      * Distribute each scan record to registered clients. When a "found" event occurs record the
      * address in the client filter so we can later send the "lost" event to that same client.
-     * <p/>
+     * <p>
      * This method will be called by the AIDL handler thread from onLeScan.
      */
     private synchronized void callbackLeScanClients(String address, ScanResult result) {
@@ -293,8 +295,6 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
     /**
      * Test for lost tags by periodically checking the found devices
      * for any that haven't been seen recently.
-     *
-     * @VisibleForTesting
      */
     protected void onScanCycleComplete() {
         Iterator<Entry<String, ScanResult>> iter = recentScanResults.entrySet().iterator();
@@ -344,10 +344,6 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
         return !serialClients.isEmpty();
     }
 
-    @Override
-    protected void onNewScanCycle() {
-        blockingScanCycle();
-    }
 
     @Override
     protected Collection<ScanResult> getRecentScanResults() {
@@ -367,7 +363,7 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
         ScanClient(ScanSettings settings, List<ScanFilter> filters, ScanCallback callback) {
             this.settings = settings;
             this.filtersList = filters;
-            this.addressesSeen = new HashSet<String>();
+            this.addressesSeen = new HashSet<>();
             this.callback = callback;
         }
     }

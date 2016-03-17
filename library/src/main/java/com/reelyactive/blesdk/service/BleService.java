@@ -13,7 +13,7 @@ import com.reelyactive.blesdk.support.ble.ScanResult;
 import com.reelyactive.blesdk.support.ble.ScanSettings;
 
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 public class BleService extends Service {
@@ -74,7 +74,7 @@ public class BleService extends Service {
         if (currentSettings != nextSettings || nextFilter != currentFilter) {
             stopScan();
             notifyEvent(Event.SCAN_STARTED);
-            scanner.startScan(Arrays.asList(nextFilter), nextSettings, callback); // TODO make it possible to scan using more filters
+            scanner.startScan(Collections.singletonList(nextFilter), nextSettings, callback); // TODO make it possible to scan using more filters
         }
         currentSettings = nextSettings;
         currentFilter = nextFilter;

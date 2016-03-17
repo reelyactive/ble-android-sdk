@@ -18,6 +18,7 @@ package com.reelyactive.blesdk.support.ble;
 import android.annotation.TargetApi;
 import android.app.AlarmManager;
 import android.app.PendingIntent;
+import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothManager;
 import android.content.Context;
 import android.content.Intent;
@@ -55,7 +56,7 @@ class LBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
 
     /**
      * Package-protected constructor, used by {@link BluetoothLeScannerCompatProvider}.
-     * <p/>
+     * <p>
      * Cannot be called from emulated devices that don't implement a BluetoothAdapter.
      */
     LBluetoothLeScannerCompat(Context context, BluetoothManager manager, AlarmManager alarmManager) {
@@ -76,7 +77,12 @@ class LBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
                               Clock clock, PendingIntent alarmIntent) {
         super(clock, alarmManager, alarmIntent);
         Logger.logDebug("BLE 'L' hardware access layer activated");
-        this.osScanner = manager.getAdapter().getBluetoothLeScanner();
+        BluetoothAdapter adapter = manager.getAdapter();
+        if (adapter != null) {
+            this.osScanner = adapter.getBluetoothLeScanner();
+        } else {
+            this.osScanner = null;
+        }
         this.recentScanResults = new ConcurrentHashMap<>();
     }
 
@@ -162,6 +168,10 @@ class LBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
 
     @Override
     public boolean startScan(List<ScanFilter> filters, ScanSettings settings, ScanCallback callback) {
+        if (osScanner == null) {
+            return false;
+        }
+
         if (callbacksMap.containsKey(callback)) {
             Logger.logInfo("StartScan(): BLE 'L' hardware scan already in progress...");
             stopScan(callback);
@@ -188,6 +198,9 @@ class LBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
 
     @Override
     public void stopScan(ScanCallback callback) {
+        if (osScanner == null) {
+            return;
+        }
         android.bluetooth.le.ScanCallback osCallback = callbacksMap.get(callback);
 
         if (osCallback != null) {
