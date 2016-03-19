@@ -22,29 +22,25 @@ import android.content.Context;
 import android.os.Build;
 import android.support.annotation.Nullable;
 
-import static android.content.Context.ALARM_SERVICE;
-import static android.content.Context.BLUETOOTH_SERVICE;
-
 /**
  * A compatibility layer for low-energy bluetooth, providing access to an implementation of
  * the {@link BluetoothLeScannerCompat} which will use the Android "L" APIs if they are present,
  * which can leverage the newest BLE hardware; or if running on an older version of the OS,
  * this provider falls back to providing a CPU-bound BLE scanner which has the same feature set.
- * <p>
+ * <p/>
  * A {@link BluetoothLeScannerCompat} allows the application to register for callback events for
  * advertising packets broadcast from Bluetooth LE devices.
  */
 public class BluetoothLeScannerCompatProvider {
 
     private static BluetoothLeScannerCompat scannerInstance;
-    private static boolean allowHardware = true;
 
     private BluetoothLeScannerCompatProvider() {
     }
 
     /**
      * Creates a {@link BluetoothLeScannerCompat} that works with the version of Android being used.
-     * <p>
+     * <p/>
      * For Android versions between Jelly Bean MR2 and "L", a compatibility layer will be used to
      * provide functionality that will be available in "L". For Android versions "L" and later, the
      * native functionality will be used.
@@ -61,7 +57,7 @@ public class BluetoothLeScannerCompatProvider {
     /**
      * Creates a {@link BluetoothLeScannerCompat}, providing either a compatibility layer or
      * access to native functionality available in "L".
-     * <p>
+     * <p/>
      *
      * @param context         The Android context of the application.
      * @param canUseNativeApi Whether or not to enable "L" hardware support, if available.
@@ -71,17 +67,20 @@ public class BluetoothLeScannerCompatProvider {
     public static synchronized BluetoothLeScannerCompat getBluetoothLeScannerCompat(
             Context context, boolean canUseNativeApi) {
         if (scannerInstance == null) {
-            BluetoothManager bluetoothManager = (BluetoothManager) context.getSystemService(BLUETOOTH_SERVICE);
-            AlarmManager alarmManager = (AlarmManager) context.getSystemService(ALARM_SERVICE);
 
-            if (bluetoothManager != null) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP
-                        && canUseNativeApi
-                        && areHardwareFeaturesSupported(bluetoothManager)) {
-                    scannerInstance = new LBluetoothLeScannerCompat(context, bluetoothManager, alarmManager);
-                } else if (alarmManager != null
-                        && Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
-                    scannerInstance = new JbBluetoothLeScannerCompat(context, bluetoothManager, alarmManager);
+            AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
+                BluetoothManager bluetoothManager = (BluetoothManager) context.getSystemService(Context.BLUETOOTH_SERVICE);
+                if (bluetoothManager != null) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP
+                            && canUseNativeApi
+                            && areHardwareFeaturesSupported(bluetoothManager)) {
+                        scannerInstance = new LBluetoothLeScannerCompat(context, bluetoothManager, alarmManager);
+                    } else if (alarmManager != null
+                            && Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
+                        scannerInstance = new JbBluetoothLeScannerCompat(context, bluetoothManager, alarmManager);
+                    }
                 }
             }
             if (scannerInstance == null) {

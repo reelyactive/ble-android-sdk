@@ -154,9 +154,9 @@ public class DummyBleAdvertiser extends BleAdvertiser {
             conn.setRequestProperty("Content-Type", "application/json");
             JSONObject jsonObject = getJsonBase();
             BluetoothInterface.MacAddress macAddress = BluetoothInterface.getMacAddress(context);
-            jsonObject.getJSONObject("tiraid").getJSONObject("identifier").put("value", macAddress.address.replace(":", "").toLowerCase());
+            jsonObject.getJSONObject("tiraid").getJSONObject("identifier").put("value", macAddress.address.replace(":", "").toLowerCase(Locale.US));
             jsonObject.getJSONObject("tiraid").getJSONObject("identifier").getJSONObject("advHeader").put("txAdd", macAddress.type);
-            jsonObject.getJSONObject("tiraid").getJSONObject("identifier").getJSONObject("advData").put("complete128BitUUIDs", uuid.replaceAll("[\\W.]", "").toLowerCase());
+            jsonObject.getJSONObject("tiraid").getJSONObject("identifier").getJSONObject("advData").put("complete128BitUUIDs", uuid.replaceAll("[\\W.]", "").toLowerCase(Locale.US));
             JSONArray decodings = jsonObject.getJSONObject("tiraid").getJSONArray("radioDecodings");
             for (ScanResult result : results) {
                 JSONObject decoding = getRadioDecodingBase();

@@ -19,7 +19,7 @@ allprojects {
 
 ext {
     build_target_sdk_version = 23
-    build_min_sdk_version = 18
+    build_min_sdk_version = 14
     buildToolsVersion = "23.0.2"
     build_sdk_version = 23
 }

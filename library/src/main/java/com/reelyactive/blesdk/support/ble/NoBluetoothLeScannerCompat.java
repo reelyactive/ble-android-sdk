@@ -75,6 +75,7 @@ public class NoBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
         for (ScanCallback callback : callbacksMap.keySet()) {
             callback.onScanCycleCompleted();
         }
+        updateRepeatingAlarm();
     }
 
     @Override
