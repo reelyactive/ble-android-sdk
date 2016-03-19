@@ -30,7 +30,7 @@ import static android.content.Context.BLUETOOTH_SERVICE;
  * the {@link BluetoothLeScannerCompat} which will use the Android "L" APIs if they are present,
  * which can leverage the newest BLE hardware; or if running on an older version of the OS,
  * this provider falls back to providing a CPU-bound BLE scanner which has the same feature set.
- * <p/>
+ * <p>
  * A {@link BluetoothLeScannerCompat} allows the application to register for callback events for
  * advertising packets broadcast from Bluetooth LE devices.
  */
@@ -44,7 +44,7 @@ public class BluetoothLeScannerCompatProvider {
 
     /**
      * Creates a {@link BluetoothLeScannerCompat} that works with the version of Android being used.
-     * <p/>
+     * <p>
      * For Android versions between Jelly Bean MR2 and "L", a compatibility layer will be used to
      * provide functionality that will be available in "L". For Android versions "L" and later, the
      * native functionality will be used.
@@ -61,7 +61,7 @@ public class BluetoothLeScannerCompatProvider {
     /**
      * Creates a {@link BluetoothLeScannerCompat}, providing either a compatibility layer or
      * access to native functionality available in "L".
-     * <p/>
+     * <p>
      *
      * @param context         The Android context of the application.
      * @param canUseNativeApi Whether or not to enable "L" hardware support, if available.
@@ -83,6 +83,9 @@ public class BluetoothLeScannerCompatProvider {
                         && Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
                     scannerInstance = new JbBluetoothLeScannerCompat(context, bluetoothManager, alarmManager);
                 }
+            }
+            if (scannerInstance == null) {
+                scannerInstance = new NoBluetoothLeScannerCompat(context, alarmManager);
             }
         }
         return scannerInstance;

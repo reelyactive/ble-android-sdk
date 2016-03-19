@@ -33,6 +33,9 @@ public class ScanWakefulService extends IntentService {
 
     @Override
     protected void onHandleIntent(Intent intent) {
+        if (intent == null) {
+            return;
+        }
         // This method runs in a worker thread.
         // At this point com.reelyactive.blesdk.support.ble.ScanWakefulBroadcastReceiver is still holding a WakeLock.
         // We can do whatever we need to do in the code below.

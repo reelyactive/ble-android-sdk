@@ -309,20 +309,6 @@ class JbBluetoothLeScannerCompat extends BluetoothLeScannerCompat {
         }
     }
 
-    private int getScanModePriority(int mode) {
-        switch (mode) {
-            case ScanSettings.SCAN_MODE_LOW_LATENCY:
-                return 2;
-            case ScanSettings.SCAN_MODE_BALANCED:
-                return 1;
-            case ScanSettings.SCAN_MODE_LOW_POWER:
-                return 0;
-            default:
-                Logger.logError("Unknown scan mode " + mode);
-                return 0;
-        }
-    }
-
     protected int getMaxPriorityScanMode() {
         int maxPriority = -1;
 

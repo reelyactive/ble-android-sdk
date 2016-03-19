@@ -302,6 +302,18 @@ public abstract class BluetoothLeScannerCompat {
         }
     }
 
+    protected int getScanModePriority(int mode) {
+        switch (mode) {
+            case ScanSettings.SCAN_MODE_LOW_LATENCY:
+            case ScanSettings.SCAN_MODE_BALANCED:
+            case ScanSettings.SCAN_MODE_LOW_POWER:
+                return mode;
+            default:
+                Logger.logError("Unknown scan mode " + mode);
+                return 0;
+        }
+    }
+
     protected Clock getClock() {
         return clock;
     }
